@@ -14,6 +14,7 @@
       --primary: #748ffc; --ok: #51cf66; --ok-bg: #1b2e20; --bad: #ff6b6b; --bad-bg: #331d1d; --warn: #ffa94d; --warn-bg: #33261a; }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, -apple-system, "Malgun Gothic", sans-serif; }
   main { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
@@ -47,13 +48,27 @@
   .kw.hit { background: var(--ok-bg); color: var(--ok); } .kw.miss { background: var(--bad-bg); color: var(--bad); }
   .footer { margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .result { font-size: 14px; color: var(--muted); }
+  .links { margin-top: 8px; display: grid; gap: 4px; }
+  .links a { color: var(--primary); text-decoration: none; font-size: 13px; }
+  .links a:hover { text-decoration: underline; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tabs button.on { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+  .flash { min-height: 260px; display: grid; place-items: center; text-align: center; cursor: pointer; padding: 28px 20px; }
+  .flash .icon { font-size: 44px; margin-bottom: 10px; }
+  .flash .front { font-size: 18px; font-weight: 600; white-space: pre-line; }
+  .flash .answer { font-size: 22px; font-weight: 800; color: var(--primary); margin-bottom: 8px; }
+  .flash .ai { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .flash .ai b { color: var(--warn); }
+  .card-actions { display: flex; gap: 10px; margin-top: 12px; }
+  .card-actions button { flex: 1; padding: 14px; font-weight: 700; }
 </style>
 </head>
 <body>
 <main>
   <h1>퀴즈 테스트</h1>
-  <p class="sub">AI 서버가 만든 문제를 직접 풀어보는 개발용 페이지예요. 틀리고 제출한 뒤 다시 만들면, 틀린 문제가 <b>다시 도전</b>으로 섞여 나와요.</p>
+  <p class="sub">AI 서버가 만든 문제와 큐카드를 직접 풀어보는 개발용 페이지예요. 퀴즈를 틀리고 제출한 뒤 다시 만들면 틀린 문제가 <b>다시 도전</b>으로 섞여 나오고, 틀린 문제에는 공부 자료 링크가 붙어요.</p>
 
+  <div class="tabs"><button id="tab-quiz" class="on">퀴즈</button><button id="tab-cards">큐카드</button></div>
   <section class="panel">
     <div class="row">
       <label class="lecture">강의<select id="lecture"></select></label>
@@ -68,6 +83,15 @@
         <select id="count"><option>3</option><option selected>5</option><option>10</option></select>
       </label>
       <button id="make" class="primary">문제 만들기</button>
+      <button id="start-cards" class="primary" hidden>큐카드 시작</button>
+    </div>
+  </section>
+  <section id="cards-view" hidden>
+    <p id="card-status" class="status"></p>
+    <article id="flash" class="q flash"></article>
+    <div id="card-actions" class="card-actions" hidden>
+      <button id="unknown">몰라요</button>
+      <button id="known" class="primary">알아요</button>
     </div>
   </section>
 
@@ -100,9 +124,9 @@ function setStatus(text, error = false) {
 
 async function loadLectures() {
   try {
-    const lectures = (await api('/api/lectures')).filter((l) => l.status === 'ready' && l.cardCount > 0)
+    const lectures = (await api('/api/lectures')).filter((l) => l.status === 'ready')
     $('lecture').innerHTML = lectures.length
-      ? lectures.map((l) => `<option value="${l.id}">${escape(l.title)} · ${escape(l.course || '과목 없음')} · 개념 ${l.cardCount}</option>`).join('')
+      ? lectures.map((l) => `<option value="${l.id}">${escape(l.title)} · ${escape(l.course || '과목 없음')} · 카드 ${l.cardCount}</option>`).join('')
       : '<option value="">요약이 끝난 강의가 없어요</option>'
     $('make').disabled = !lectures.length
   } catch (e) {
@@ -173,7 +197,14 @@ function renderQuestions() {
     </article>`).join('')
 }
 
+function resourceLinks(q) {
+  if (!q.resources?.length) return ''
+  const items = q.resources.map((r) => `<a href="${escape(r.url)}" target="_blank" rel="noopener">📖 ${escape(r.title)} <span style="color:var(--muted)">· ${escape(r.source)}</span></a>`).join('')
+  return `<div class="links"><b style="font-size:13px">이 개념 다시 공부하기</b>${items}</div>`
+}
+
 function answer(q, correct, feedbackHtml) {
+  if (correct === false) feedbackHtml += resourceLinks(q)
   const card = $('q-' + q.id)
   card.querySelectorAll('button').forEach((b) => (b.disabled = true))
   const fb = card.querySelector('.feedback')
@@ -227,6 +258,74 @@ $('submit').addEventListener('click', async () => {
     $('submit').disabled = false
   }
 })
+
+// ---------- 큐카드 ----------
+let session = null, cardIndex = 0, flipped = false, cardResults = []
+
+function setMode(mode) {
+  const cardsMode = mode === 'cards'
+  $('tab-quiz').classList.toggle('on', !cardsMode)
+  $('tab-cards').classList.toggle('on', cardsMode)
+  for (const id of ['make', 'list', 'meta', 'status']) $(id).hidden = cardsMode
+  $('footer').hidden = cardsMode || !quiz
+  for (const el of document.querySelectorAll('label')) if (!el.classList.contains('lecture')) el.hidden = cardsMode
+  $('start-cards').hidden = !cardsMode
+  $('cards-view').hidden = !cardsMode
+}
+
+async function startCards() {
+  $('start-cards').disabled = true
+  try {
+    session = await api(`/api/lectures/${$('lecture').value}/card-sessions`, {})
+    if (!session) { $('card-status').textContent = '이 강의에는 큐카드가 없어요.'; return }
+    cardIndex = 0; cardResults = []
+    $('card-status').textContent = `다시 볼 카드 ${session.dueCount}장이 앞에 있어요.`
+    showCard()
+  } catch (e) {
+    $('card-status').textContent = '큐카드를 불러오지 못했어요: ' + e.message
+  } finally {
+    $('start-cards').disabled = false
+  }
+}
+
+function showCard() {
+  const c = session.cards[cardIndex]
+  flipped = false
+  $('card-actions').hidden = true
+  const box = c.box ? `${c.box}번 상자` : '새 카드'
+  $('flash').innerHTML = `<div><div class="q-head" style="justify-content:center">${cardIndex + 1} / ${session.cards.length} · ${box}</div>
+    <div class="icon">${escape(c.icon)}</div><div class="front">${escape(c.front)}</div>
+    <p class="sub" style="margin-top:16px">눌러서 정답 확인</p></div>`
+}
+
+$('flash').addEventListener('click', () => {
+  if (!session || flipped || cardIndex >= session.cards.length) return
+  const c = session.cards[cardIndex]
+  flipped = true
+  $('flash').innerHTML = `<div><div class="answer">${escape(c.answer)}</div><div>${escape(c.explanation)}</div>
+    ${c.example ? `<div class="ai"><b>AI 예시</b> ${escape(c.example)}</div>` : ''}</div>`
+  $('card-actions').hidden = false
+})
+
+async function rate(known) {
+  cardResults.push({ cardId: session.cards[cardIndex].id, known })
+  cardIndex++
+  if (cardIndex < session.cards.length) return showCard()
+  $('card-actions').hidden = true
+  try {
+    const r = await api(`/api/card-sessions/${session.id}/submit`, { results: cardResults })
+    $('flash').innerHTML = `<div><div class="icon">🎉</div><div class="front">한 세트 끝!</div>
+      <p class="sub">알아요 ${r.known}장 · 몰라요 ${r.unknown}장. 몰라요 카드는 다음 세트 앞에 나와요.</p></div>`
+  } catch (e) {
+    $('flash').textContent = '결과를 저장하지 못했어요: ' + e.message
+  }
+}
+
+$('known').addEventListener('click', () => rate(true))
+$('unknown').addEventListener('click', () => rate(false))
+$('start-cards').addEventListener('click', startCards)
+$('tab-quiz').addEventListener('click', () => setMode('quiz'))
+$('tab-cards').addEventListener('click', () => setMode('cards'))
 
 $('make').addEventListener('click', makeQuiz)
 loadLectures()
