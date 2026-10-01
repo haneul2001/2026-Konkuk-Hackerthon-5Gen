@@ -84,10 +84,12 @@ export function Layout() {
 
   return (
     <PhoneFrame>
-      <StatusBar />
-      {/* 상단 배너: 상태바 아래 화면 폭 가득 쿠 진녹색 띠, 아래쪽에만 노란 선 */}
-      {!immersive && (
-        <div className="relative z-10 mt-[env(safe-area-inset-top)] mb-1 shrink-0 border-b-2 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
+      {/* 상단 배너: 화면 맨 위(상태바·노치 영역)부터 쿠 진녹색으로 덮고, 아래쪽에만 노란 선 */}
+      {immersive ? (
+        <StatusBar />
+      ) : (
+        <div className="relative z-10 mb-1 shrink-0 border-b-2 border-highlight bg-primary pt-[env(safe-area-inset-top)] text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
+          <StatusBar />
           <TopBar isRoot={isRoot} avatar={avatar} />
         </div>
       )}
@@ -154,8 +156,8 @@ function TopBar({ isRoot, avatar }: { isRoot: boolean; avatar: string }) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between px-3">
       {isRoot ? (
-        <span className="px-2 text-[20px] font-extrabold tracking-tight">
-          <span className="text-lime">{APP_NAME.slice(0, 1)}</span>
+        <span className="px-2 text-[26px] font-extrabold tracking-tight">
+          <span className="text-highlight">{APP_NAME.slice(0, 1)}</span>
           {APP_NAME.slice(1)}
         </span>
       ) : (
