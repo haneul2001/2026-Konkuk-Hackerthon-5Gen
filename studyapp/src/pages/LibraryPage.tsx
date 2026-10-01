@@ -529,103 +529,123 @@ function FolderGrid<T extends { id: string; name: string }>({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5">
-        {shown.map((f) =>
-          moving ? (
-            // 순서 이동 중: 카드 전체가 고르는 버튼
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={f.id === moving}
-              aria-label={f.id === moving ? `${f.name} (옮길 폴더, 누르면 취소)` : `${f.name} 폴더와 자리 바꾸기`}
-              onClick={() => swapWith(f.id)}
-              className={cn(
-                card,
-                'relative cursor-pointer',
-                f.id === moving
-                  ? 'border-primary shadow-[0_3px_0_var(--color-primary)]'
-                  : 'border-line shadow-[0_3px_0_var(--color-line)]',
-              )}
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  'absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border-2',
-                  f.id === moving ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface',
-                )}
-              >
-                {f.id === moving && <Check className="size-4" strokeWidth={3} />}
-              </span>
-              <FolderCardBody name={f.name} count={`${unit} ${countOf(f)}개`} />
-            </button>
-          ) : (
-            <div key={f.id} className="relative">
-              <Link
-                to={linkOf(f)}
+      {shown.length === 0 && !moving ? (
+        // 폴더가 하나도 없을 때: 빈 점선 칸 대신 무엇을 하는 곳인지 알려 주는 카드
+        <div className="flex items-center gap-3.5 rounded-2xl border-2 border-line bg-surface p-4 shadow-[0_3px_0_var(--color-line)]">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-highlight-soft text-primary-deep">
+            <FolderIcon className="size-6" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-bold">아직 폴더가 없어요</p>
+            <p className="mt-0.5 text-[13px] text-pretty text-muted">과목·시험 범위별로 {unit}을 모아 보세요.</p>
+          </div>
+          <Button variant="inverse" className="h-10 shrink-0 px-3.5 text-[14px]" onClick={onCreate}>
+            <FolderPlus className="size-4" aria-hidden />
+            만들기
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5">
+          {shown.map((f) =>
+            moving ? (
+              // 순서 이동 중: 카드 전체가 고르는 버튼
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={f.id === moving}
+                aria-label={f.id === moving ? `${f.name} (옮길 폴더, 누르면 취소)` : `${f.name} 폴더와 자리 바꾸기`}
+                onClick={() => swapWith(f.id)}
                 className={cn(
                   card,
-                  'press cursor-pointer border-line pr-10 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)]',
+                  'relative cursor-pointer',
+                  f.id === moving
+                    ? 'border-primary shadow-[0_3px_0_var(--color-primary)]'
+                    : 'border-line shadow-[0_3px_0_var(--color-line)]',
                 )}
               >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border-2',
+                    f.id === moving ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface',
+                  )}
+                >
+                  {f.id === moving && <Check className="size-4" strokeWidth={3} />}
+                </span>
                 <FolderCardBody name={f.name} count={`${unit} ${countOf(f)}개`} />
-              </Link>
-              <button
-                type="button"
-                aria-label={`${f.name} 폴더 메뉴`}
-                aria-expanded={menuFor === f.id}
-                onClick={() => setMenuFor((m) => (m === f.id ? null : f.id))}
-                className="absolute top-1.5 right-1.5 flex size-9 cursor-pointer items-center justify-center rounded-full text-muted active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                <EllipsisVertical className="size-5" aria-hidden />
               </button>
-              {menuFor === f.id && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="메뉴 닫기"
-                    className="fixed inset-0 z-10 cursor-default"
-                    onClick={() => setMenuFor(null)}
-                  />
-                  <div
-                    role="menu"
-                    className="absolute top-11 right-1.5 z-20 w-36 overflow-hidden rounded-xl border-2 border-line bg-surface py-1 shadow-[0_4px_0_var(--color-line)]"
-                  >
-                    {menu(f).map((m) => (
-                      <button
-                        key={m.label}
-                        type="button"
-                        role="menuitem"
-                        disabled={m.disabled}
-                        onClick={() => {
-                          setMenuFor(null)
-                          m.onClick()
-                        }}
-                        className={cn(
-                          'flex h-11 w-full cursor-pointer items-center gap-2.5 px-4 text-[15px] font-semibold active:bg-bg',
-                          'disabled:cursor-not-allowed disabled:opacity-50',
-                          m.danger && 'text-danger',
-                        )}
-                      >
-                        <m.icon className={cn('size-5', !m.danger && 'text-muted')} aria-hidden />
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          ),
-        )}
-        {!moving && (
-          <button
-            type="button"
-            onClick={onCreate}
-            className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-line-strong text-[14px] font-bold text-primary active:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <FolderPlus className="size-6" aria-hidden />새 폴더
-          </button>
-        )}
-      </div>
+            ) : (
+              <div key={f.id} className="relative">
+                <Link
+                  to={linkOf(f)}
+                  className={cn(
+                    card,
+                    'press cursor-pointer border-line pr-10 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)]',
+                  )}
+                >
+                  <FolderCardBody name={f.name} count={`${unit} ${countOf(f)}개`} />
+                </Link>
+                <button
+                  type="button"
+                  aria-label={`${f.name} 폴더 메뉴`}
+                  aria-expanded={menuFor === f.id}
+                  onClick={() => setMenuFor((m) => (m === f.id ? null : f.id))}
+                  className="absolute top-1.5 right-1.5 flex size-9 cursor-pointer items-center justify-center rounded-full text-muted active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <EllipsisVertical className="size-5" aria-hidden />
+                </button>
+                {menuFor === f.id && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="메뉴 닫기"
+                      className="fixed inset-0 z-10 cursor-default"
+                      onClick={() => setMenuFor(null)}
+                    />
+                    <div
+                      role="menu"
+                      className="absolute top-11 right-1.5 z-20 w-36 overflow-hidden rounded-xl border-2 border-line bg-surface py-1 shadow-[0_4px_0_var(--color-line)]"
+                    >
+                      {menu(f).map((m) => (
+                        <button
+                          key={m.label}
+                          type="button"
+                          role="menuitem"
+                          disabled={m.disabled}
+                          onClick={() => {
+                            setMenuFor(null)
+                            m.onClick()
+                          }}
+                          className={cn(
+                            'flex h-11 w-full cursor-pointer items-center gap-2.5 px-4 text-[15px] font-semibold active:bg-bg',
+                            'disabled:cursor-not-allowed disabled:opacity-50',
+                            m.danger && 'text-danger',
+                          )}
+                        >
+                          <m.icon className={cn('size-5', !m.danger && 'text-muted')} aria-hidden />
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ),
+          )}
+          {!moving && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="press flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line-strong bg-surface/60 text-[14px] font-bold text-primary-deep active:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-highlight text-primary-deep shadow-[0_2px_0_var(--color-highlight-deep)]">
+                <FolderPlus className="size-5" aria-hidden />
+              </span>
+              새 폴더
+            </button>
+          )}
+        </div>
+      )}
 
       {renaming && (
         <RenameSheet
