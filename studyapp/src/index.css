@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+  디자인 토큰. 메인은 건국대 UI의 KU Dark Green(#036B29), 보조는 KU Light Green·라임.
+  스타일은 UI UX Pro Max의 Flat + Vibrant & Block-based. 글자 대비 4.5:1 이상.
+  컴포넌트에서는 hex 대신 이 이름만 쓴다. 그라디언트·글로우·보라색 없음.
+*/
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+
+  --color-bg: #f3faf4;
+  --color-surface: #ffffff;
+  --color-ink: #10301b;
+  --color-muted: #4d6655;
+  --color-line: #d3e8d8;
+  --color-line-strong: #afd3b7;
+
+  --color-primary: #036b29; /* KU Dark Green, 흰 글자 대비 6.9:1 */
+  --color-primary-deep: #024a1c; /* 블록 버튼 바닥 그림자 */
+  --color-primary-soft: #dcf5e1;
+  --color-bright: #21ba31; /* KU Light Green, 채움·아이콘 전용 */
+  --color-highlight: #b8f329; /* KU 라임, 진녹색 위 강조 */
+
+  --color-accent: #ea580c; /* 스트릭·순위. 아이콘·채움 전용 */
+  --color-accent-ink: #c2410c; /* 글자용 */
+  --color-accent-soft: #ffedd5;
+
+  --color-success: #15803d;
+  --color-success-soft: #dcfce7;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-danger-deep: #7f1d1d;
+
+  /* 데스크톱에서 폰 프레임 바깥 */
+  --color-desk: #dce6de;
+  --color-bezel: #13231a;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-desk text-ink antialiased;
+  /* 한국어는 어절 단위로 줄바꿈 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* 블록형 눌림 효과. 위치만 움직이고 크기는 안 바꾼다. */
+@utility press {
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+  &:active {
+    transform: translateY(2px);
+  }
+}
+
+/* 폰 프레임 안 스크롤바 숨김 (휴대폰처럼) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 마스코트 숨쉬기. 장식이 아니라 "살아있는 캐릭터" 신호라 아주 작게만 */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+@keyframes rage {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 1px); }
+  50% { transform: translate(2px, -1px); }
+  75% { transform: translate(-1px, -1px); }
+}
+@keyframes droop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(3px) rotate(-2deg); }
+}
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  60% { transform: translateY(-10px); }
+}
+
+/* 알림 배너가 위에서 내려온다 */
+@keyframes banner-in {
+  from { transform: translateY(-120%); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

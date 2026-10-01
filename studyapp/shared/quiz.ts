@@ -1,0 +1,222 @@
+import { concepts, folders, league, lectures, localDate, me, todayReviews } from './mock'
+import { daysSinceStudy, solvedToday } from './mood'
+import { noticesAfterSubmit } from './notices'
+import { quizBank } from './quizBank'
+import type {
+  EssayQuestion,
+  Quiz,
+  QuizQuestion,
+  QuizSource,
+  QuizSubmission,
+  QuizSubmitResult,
+  QuizType,
+} from './types'
+
+// 퀴즈 만들기·채점·결과 반영. 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
+// 출제 기준은 "개념 묶음": 강의의 개념 전체, 또는 사용자가 만든 폴더의 개념.
+// 상태는 메모리의 목 데이터를 직접 고친다. DB가 붙으면 반영 부분만 바꾸면 된다.
+
+export const XP_PER_CORRECT = 10
+
+// 문제 은행을 평평하게 펴고, 문제 → 강의 연결을 기억해 둔다(오답·복습은 강의 단위라서).
+const allQuestions: QuizQuestion[] = Object.values(quizBank).flat()
+const lectureOf = new Map<string, string>(
+  Object.entries(quizBank).flatMap(([lectureId, qs]) => qs.map((q) => [q.id, lectureId] as const)),
+)
+
+// 오답 기록: 강의 id → 틀린 문제 id. 홈의 "오늘 복습(틀린 문제)"이 여기서 나온다.
+// 목 데이터의 rev_1(운영체제 3문제)과 맞춰 둔다.
+const wrongByLecture = new Map<string, Set<string>>([
+  ['lec_2', new Set(['lec_2_m1', 'lec_2_o2', 'lec_2_m3'])],
+])
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+// 객관식 보기 순서도 섞는다. 정답 위치를 외우지 못하게.
+function shuffleChoices(q: QuizQuestion): QuizQuestion {
+  if (q.type !== 'multiple') return q
+  const order = shuffle(q.choices.map((_, i) => i))
+  return {
+    ...q,
+    choices: order.map((i) => q.choices[i]),
+    answerIndex: order.indexOf(q.answerIndex),
+  }
+}
+
+function newQuizId() {
+  return `quiz_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+}
+
+// 출제 범위(개념 id 목록)와 화면에 띄울 제목
+export function scopeOf(source: QuizSource): { title: string; conceptIds: string[] } | null {
+  if (source.kind === 'lecture') {
+    const lecture = lectures.find((l) => l.id === source.id)
+    if (!lecture) return null
+    return {
+      title: lecture.title,
+      conceptIds: concepts.filter((c) => c.lectureId === source.id).map((c) => c.id),
+    }
+  }
+  if (source.kind === 'folder') {
+    const folder = folders.find((f) => f.id === source.id)
+    if (!folder) return null
+    return { title: folder.name, conceptIds: folder.conceptIds }
+  }
+  return null
+}
+
+export function questionsFor(conceptIds: string[], type?: QuizType) {
+  const ids = new Set(conceptIds)
+  return allQuestions.filter((q) => ids.has(q.conceptId) && (!type || q.type === type))
+}
+
+export function availableCount(conceptIds: string[], type: QuizType) {
+  return questionsFor(conceptIds, type).length
+}
+
+export function buildQuiz(
+  source: Exclude<QuizSource, { kind: 'review' }>,
+  type: QuizType,
+  count: number,
+): Quiz | null {
+  const scope = scopeOf(source)
+  if (!scope) return null
+  const pool = questionsFor(scope.conceptIds, type)
+  if (pool.length === 0) return null
+  return {
+    id: newQuizId(),
+    title: scope.title,
+    source,
+    questions: shuffle(pool).slice(0, count).map(shuffleChoices),
+  }
+}
+
+// 복습 퀴즈: 틀린 문제 복습이면 오답 기록에서, 간격 복습이면 자동 채점되는 문제 중에서 고른다.
+export function buildReviewQuiz(reviewId: string): Quiz | null {
+  const review = todayReviews.find((r) => r.id === reviewId)
+  if (!review) return null
+  const bank = quizBank[review.lectureId] ?? []
+  let questions: QuizQuestion[]
+  if (review.reason === 'wrong') {
+    const wrong = wrongByLecture.get(review.lectureId) ?? new Set()
+    questions = bank.filter((q) => wrong.has(q.id))
+  } else {
+    questions = shuffle(bank.filter((q) => q.type !== 'essay')).slice(0, review.questionCount)
+  }
+  if (questions.length === 0) return null
+  return {
+    id: newQuizId(),
+    title: review.lectureTitle,
+    source: { kind: 'review', id: reviewId },
+    questions: shuffle(questions).map(shuffleChoices),
+  }
+}
+
+// 서술형 임시 채점: 핵심어 묶음 포함 여부만 본다. AI 피드백이 붙으면 대체.
+export function gradeEssay(q: EssayQuestion, text: string) {
+  const normalized = text.replace(/\s+/g, '').toLowerCase()
+  const hit = (group: string[]) =>
+    group.some((w) => normalized.includes(w.replace(/\s+/g, '').toLowerCase()))
+  return {
+    matched: q.keywords.filter(hit).map((g) => g[0]),
+    missing: q.keywords.filter((g) => !hit(g)).map((g) => g[0]),
+  }
+}
+
+export function submitQuiz(sub: QuizSubmission): QuizSubmitResult {
+  const graded = sub.results.filter(
+    (r) => r.correct !== null && lectureOf.has(r.questionId),
+  )
+  const correctCount = graded.filter((r) => r.correct).length
+  const xpGained = correctCount * XP_PER_CORRECT
+  const today = localDate()
+  const before = { solved: solvedToday(me, today), xpTotal: me.xpTotal }
+
+  // 학습 기록: 오늘 처음 푸는 거면 연속 기록을 잇거나(어제 했음) 새로 시작한다.
+  if (sub.results.length > 0) {
+    if (me.lastStudyDate !== today) {
+      me.streakDays = daysSinceStudy(me, today) === 1 ? me.streakDays + 1 : 1
+      me.todaySolved = 0
+      me.lastStudyDate = today
+    }
+    me.todaySolved += sub.results.length
+  }
+
+  // XP와 리그 순위
+  me.xpTotal += xpGained
+  me.xpThisWeek += xpGained
+  const mine = league.find((e) => e.isMe)
+  if (mine) mine.xpThisWeek = me.xpThisWeek
+  league.sort((a, b) => b.xpThisWeek - a.xpThisWeek)
+  league.forEach((e, i) => (e.rank = i + 1))
+  if (mine) me.leagueRank = mine.rank
+
+  // 끝낸 간격 복습은 목록에서 뺀다.
+  if (sub.source.kind === 'review') {
+    const i = todayReviews.findIndex((r) => r.id === sub.source.id && r.reason === 'interval')
+    if (i >= 0) todayReviews.splice(i, 1)
+  }
+
+  // 오답 기록은 강의 단위. 폴더 퀴즈는 여러 강의에 걸칠 수 있어서 문제마다 강의를 찾아 나눈다.
+  const touched = new Set<string>()
+  for (const r of graded) {
+    const lectureId = lectureOf.get(r.questionId)!
+    const wrong = wrongByLecture.get(lectureId) ?? new Set<string>()
+    if (r.correct) wrong.delete(r.questionId)
+    else wrong.add(r.questionId)
+    wrongByLecture.set(lectureId, wrong)
+    touched.add(lectureId)
+  }
+  for (const lectureId of touched) syncWrongReview(lectureId)
+
+  // 개념 숙련도: 이번에 하나라도 틀리면 익히는 중, 다 맞으면 한 단계 올린다.
+  const byConcept = new Map<string, boolean>()
+  for (const r of graded) {
+    const q = allQuestions.find((x) => x.id === r.questionId)
+    if (!q) continue
+    byConcept.set(q.conceptId, (byConcept.get(q.conceptId) ?? true) && !!r.correct)
+  }
+  for (const [conceptId, allRight] of byConcept) {
+    const c = concepts.find((x) => x.id === conceptId)
+    if (!c) continue
+    if (!allRight) c.mastery = 'learning'
+    else c.mastery = c.mastery === 'new' ? 'learning' : 'mastered'
+  }
+
+  return {
+    xpGained,
+    xpTotal: me.xpTotal,
+    leagueRank: me.leagueRank,
+    notices: noticesAfterSubmit(before),
+  }
+}
+
+// "틀린 문제 다시 풀기" 복습 항목을 남은 오답 수에 맞춘다.
+function syncWrongReview(lectureId: string) {
+  const wrong = wrongByLecture.get(lectureId) ?? new Set()
+  const i = todayReviews.findIndex((r) => r.lectureId === lectureId && r.reason === 'wrong')
+  if (wrong.size === 0) {
+    if (i >= 0) todayReviews.splice(i, 1)
+    return
+  }
+  if (i >= 0) {
+    todayReviews[i].questionCount = wrong.size
+    return
+  }
+  const lecture = lectures.find((l) => l.id === lectureId)
+  todayReviews.unshift({
+    id: `rev_wrong_${lectureId}`,
+    lectureId,
+    lectureTitle: lecture?.title ?? '',
+    course: lecture?.course ?? '',
+    reason: 'wrong',
+    questionCount: wrong.size,
+  })
+}
