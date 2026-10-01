@@ -206,7 +206,7 @@ export function HomePage() {
                   aria-current={e.isMe ? 'true' : undefined}
                   className={cn(
                     'flex h-12 items-center gap-3 px-4 text-[15px]',
-                    e.isMe && 'bg-primary-soft',
+                    e.isMe && 'bg-highlight-soft',
                   )}
                 >
                   <span
@@ -219,7 +219,7 @@ export function HomePage() {
                   </span>
                   <span className={cn('flex-1', e.isMe && 'font-bold')}>
                     {e.name}
-                    {e.isMe && <span className="ml-1.5 text-[13px] text-primary">나</span>}
+                    {e.isMe && <span className="ml-1.5 text-[13px] text-accent-ink">나</span>}
                   </span>
                   <span className="font-semibold tabular-nums">{e.xpThisWeek} XP</span>
                 </li>
