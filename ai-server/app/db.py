@@ -105,7 +105,7 @@ class Concept(Base):
 
 class ConceptResource(Base):
     """개념별 공부 자료 링크. 퀴즈에서 틀렸을 때 보여준다 (app/resources.py).
-    주소는 위키백과 API·네이버 검색 결과에서만 나온다 (LLM이 주소를 만들지 않는다)."""
+    주소는 위키백과 API·카카오 검색 결과에서만 나온다 (LLM이 주소를 만들지 않는다)."""
 
     __tablename__ = "concept_resources"
     __table_args__ = (UniqueConstraint("concept_id", "url"),)

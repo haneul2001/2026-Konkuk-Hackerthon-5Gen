@@ -3,8 +3,9 @@
 LLM이 링크 주소를 직접 쓰면 없는 페이지를 지어낼 수 있다. 그래서 주소는 검색 결과에서만 나온다.
 - 위키백과: LLM이 영어 검색어를 만들고 → 위키백과 API로 실제 문서를 후보로 모으고 →
   LLM이 첫 문장을 보고 강의 개념과 같은 문서를 고른다. 고른 문서의 한국어판이 있으면 같이 준다.
-- 블로그: 네이버 검색 API(블로그·웹문서)로 찾은 글 중 trusted_sites.txt 에 있는 도메인만 후보로 두고,
-  LLM이 제목·요약을 보고 맞는 글을 고른다. NAVER_CLIENT_ID/SECRET 이 없으면 건너뛴다.
+- 블로그: 카카오(다음) 검색 API(블로그·웹문서)로 찾은 글 중 trusted_sites.txt 에 있는 도메인만 후보로 두고,
+  LLM이 제목·요약을 보고 맞는 글을 고른다. KAKAO_REST_API_KEY 가 없으면 건너뛴다.
+  (네이버 검색 API는 2026-07-31 종료, 구글 Custom Search JSON API는 신규 가입 불가라 카카오를 쓴다)
 어느 단계가 실패해도 강의 처리는 계속되고, 찾은 만큼만 저장한다.
 """
 import html
@@ -23,7 +24,7 @@ log = logging.getLogger(__name__)
 # 위키백과 API 정책상 연락 가능한 User-Agent를 붙인다
 _UA = {"User-Agent": "StudyHelperHackathon/0.1 (https://github.com/haneul2001/2026-Konkuk-Hackerthon-5Gen)"}
 _EN_API = "https://en.wikipedia.org/w/api.php"
-_NAVER_API = "https://openapi.naver.com/v1/search"
+_KAKAO_API = "https://dapi.kakao.com/v2/search"
 _TIMEOUT = 10
 TRUSTED_SITES_FILE = BASE_DIR / "trusted_sites.txt"
 MAX_BLOGS_PER_CONCEPT = 2
@@ -164,7 +165,7 @@ def _find_wikipedia(concepts: list[dict], course: str, provider: str) -> dict[st
     return found
 
 
-# ---------- 블로그 (네이버 검색) ----------
+# ---------- 블로그 (카카오 검색) ----------
 
 _BLOG_PICK_SYSTEM = f"""너는 대학 강의 개념을 공부하기 좋은 블로그 글을 고른다.
 각 개념마다 후보 글 중에서 그 개념을 직접 설명하는 글을 최대 {MAX_BLOGS_PER_CONCEPT}개 번호로 고른다.
@@ -179,9 +180,9 @@ def trusted_sites() -> list[str]:
     return [line.strip().lower() for line in lines if line.strip() and not line.strip().startswith("#")]
 
 
-def _naver_keys() -> dict | None:
-    cid, secret = os.getenv("NAVER_CLIENT_ID"), os.getenv("NAVER_CLIENT_SECRET")
-    return {"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": secret} if cid and secret else None
+def _kakao_headers() -> dict | None:
+    key = os.getenv("KAKAO_REST_API_KEY")
+    return {"Authorization": f"KakaoAK {key}"} if key else None
 
 
 def _site_of(url: str, sites: list[str]) -> str | None:
@@ -189,20 +190,20 @@ def _site_of(url: str, sites: list[str]) -> str | None:
     return next((s for s in sites if host == s or host.endswith("." + s)), None)
 
 
-def _naver_search(query: str, headers: dict, sites: list[str]) -> list[dict]:
-    """블로그 검색(네이버 블로그 위주) + 웹문서 검색(티스토리 등)에서 신뢰 사이트 글만"""
+def _kakao_search(query: str, headers: dict, sites: list[str]) -> list[dict]:
+    """블로그 검색(티스토리·다음 블로그) + 웹문서 검색(일반 사이트)에서 신뢰 사이트 글만"""
     posts = []
-    for kind in ("blog", "webkr"):
-        url = f"{_NAVER_API}/{kind}.json?" + urllib.parse.urlencode({"query": query, "display": 30})
-        for item in _get_json(url, headers).get("items", []):
-            site = _site_of(item.get("link", ""), sites)
+    for kind in ("blog", "web"):
+        url = f"{_KAKAO_API}/{kind}?" + urllib.parse.urlencode({"query": query, "size": 50})
+        for doc in _get_json(url, headers).get("documents", []):
+            site = _site_of(doc.get("url", ""), sites)
             if site:
-                posts.append({"site": site, "title": _clean(item["title"]), "url": item["link"], "snippet": _clean(item.get("description", ""))[:200]})
+                posts.append({"site": site, "title": _clean(doc["title"]), "url": doc["url"], "snippet": _clean(doc.get("contents", ""))[:200]})
     return posts
 
 
 def _find_blogs(concepts: list[dict], course: str, provider: str) -> dict[str, list[dict]]:
-    headers, sites = _naver_keys(), trusted_sites()
+    headers, sites = _kakao_headers(), trusted_sites()
     if not headers or not sites:
         return {}
     candidates: dict[str, list[dict]] = {}
@@ -211,7 +212,7 @@ def _find_blogs(concepts: list[dict], course: str, provider: str) -> dict[str, l
         for query in (c["term"], f"{course} {c['term']}" if course else None):
             if not query:
                 continue
-            for post in _naver_search(query, headers, sites):
+            for post in _kakao_search(query, headers, sites):
                 if post["url"] not in seen:
                     seen.add(post["url"])
                     posts.append(post)
