@@ -37,7 +37,7 @@ import { current, refreshLeague, setLeagueOpponents } from '../shared/session'
 import { submitQuiz, type GradedResult } from '../shared/quiz'
 import { finishCardSet } from '../shared/cards'
 import { DEMO_OPPONENTS, seedDemoPosts } from '../shared/demo'
-import { login, requireAuth, signup } from './auth'
+import { guestAllowed, guestLogin, login, requireAuth, signup } from './auth'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
 // XP·리그·연속 학습일·오늘 복습·폴더·게시판은 여기서 목 데이터로 처리한다.
@@ -105,7 +105,8 @@ app.get('/api/health', async (_req, res) => {
     // AI 서버 꺼짐
   }
   // store: AI 서버 DB에서 상태를 불러왔는지. false면 바뀐 게 저장되지 않는다
-  res.json({ ok: true, ai, store: isLoaded() })
+  // guest: 로그인 화면에 '둘러보기' 버튼을 보일지 (로컬만)
+  res.json({ ok: true, ai, store: isLoaded(), guest: guestAllowed })
 })
 
 // ---- 로그인 (로그인 없이) ----
@@ -115,6 +116,12 @@ app.post('/api/auth/signup', async (req, res) => {
   const r = await signup(req.body ?? {})
   if ('error' in r) return res.status(r.status).json({ error: r.error })
   scheduleSave(r.user.id)
+  res.json(r)
+})
+// 둘러보기: 로컬 개발용 게스트로 들어간다 (AI 서버 없이 됨)
+app.post('/api/auth/guest', (_req, res) => {
+  const r = guestLogin()
+  if ('error' in r) return res.status(r.status).json({ error: r.error })
   res.json(r)
 })
 app.post('/api/auth/login', async (req, res) => {

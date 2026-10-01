@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { PhoneFrame, StatusBar } from '../components/Layout'
@@ -19,10 +19,27 @@ export function LoginPage() {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [guestOk, setGuestOk] = useState(false) // 로컬 서버면 '둘러보기' 버튼
+
+  useEffect(() => {
+    api.guestAllowed().then(setGuestOk)
+  }, [])
 
   if (getToken()) return <Navigate to="/" replace />
 
   const ready = login.trim().length > 0 && password.length > 0 && (mode === 'login' || name.trim().length > 0)
+
+  async function browse() {
+    setBusy(true)
+    setError('')
+    try {
+      setToken((await api.guest()).token)
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '서버에 연결할 수 없어요')
+      setBusy(false)
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -48,7 +65,7 @@ export function LoginPage() {
       <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6 py-8">
         <form onSubmit={submit} className="my-auto w-full space-y-5">
           <div className="flex flex-col items-center text-center">
-            <Mascot mood="glad" className="w-28" />
+            <Mascot pose="welcome" className="w-32" />
             <h1 className="mt-3 text-[28px] font-extrabold tracking-tight text-primary">
               <span className="text-bright">{APP_NAME.slice(0, 1)}</span>
               {APP_NAME.slice(1)}
@@ -108,6 +125,17 @@ export function LoginPage() {
           <Button type="submit" variant="primary" className="w-full" disabled={!ready || busy}>
             {busy ? '잠시만요…' : mode === 'login' ? '로그인' : '가입하고 시작'}
           </Button>
+
+          {guestOk && (
+            <button
+              type="button"
+              onClick={browse}
+              disabled={busy}
+              className="h-11 w-full cursor-pointer rounded-xl border-2 border-dashed border-line-strong text-[14px] font-semibold text-muted active:bg-surface disabled:opacity-50"
+            >
+              로그인 없이 둘러보기 <span className="text-[12px]">(로컬 전용)</span>
+            </button>
+          )}
         </form>
       </div>
     </PhoneFrame>

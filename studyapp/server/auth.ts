@@ -129,10 +129,27 @@ declare module 'express-serve-static-core' {
   }
 }
 
+// ---- 둘러보기(게스트): 로컬 개발용. AI 서버 없이 들어가서 화면을 본다 ----
+// Render(RENDER 환경 변수가 있음)에선 꺼져 있다. 배포에서도 켜려면 ALLOW_GUEST=1.
+// 게스트는 AI 서버 DB의 사용자 테이블에 넣지 않고 메모리에만 있다(Express를 다시 켜면 빈 상태).
+export const GUEST_ID = 'u_guest'
+export const guestAllowed = !process.env.RENDER || process.env.ALLOW_GUEST === '1'
+
+function guestState() {
+  if (!users.has(GUEST_ID)) users.set(GUEST_ID, newUserState(GUEST_ID, 'guest', '게스트'))
+  return users.get(GUEST_ID)!
+}
+
+export function guestLogin(): AuthResult {
+  if (!guestAllowed) return { error: '둘러보기는 로컬에서만 돼요', status: 403 }
+  return { token: issueToken(GUEST_ID), user: guestState().me }
+}
+
 export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
   const id = token ? readToken(token) : null
-  const state = id ? users.get(id) : undefined
+  // 게스트는 Express를 다시 켜도 토큰이 그대로 통하게 상태를 다시 만든다
+  const state = id === GUEST_ID && guestAllowed ? guestState() : id ? users.get(id) : undefined
   if (!state) return res.status(401).json({ error: '로그인이 필요해요' })
   req.user = state
   als.run(state, next)

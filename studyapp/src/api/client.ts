@@ -119,6 +119,9 @@ async function authCall(path: string, body: unknown): Promise<{ token: string; u
 export const api = {
   signup: (input: { login: string; password: string; name: string }) => authCall('/api/auth/signup', input),
   login: (input: { login: string; password: string }) => authCall('/api/auth/login', input),
+  guest: () => authCall('/api/auth/guest', {}),
+  // 로그인 화면용: 둘러보기 버튼을 보일지
+  guestAllowed: async () => (await get<{ guest?: boolean }>('/api/health', {})).guest === true,
   me: () => get<UserSummary>('/api/me', current().me),
   updateProfile: (patch: { name?: string; dailyGoal?: number }) =>
     send<UserSummary | { error: string }>('PATCH', '/api/me', patch, () => profile.updateProfile(patch)),
