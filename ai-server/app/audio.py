@@ -3,6 +3,7 @@
 강한 잡음 제거는 STT 인식률을 오히려 떨어뜨릴 수 있어서 기본값(clean)은
 저주파 제거 + 음량 정규화만 한다. 무음 구간은 STT 단계의 VAD가 처리한다.
 """
+import re
 import subprocess
 from pathlib import Path
 
@@ -19,6 +20,21 @@ PRESETS: dict[str, str | None] = {
     "clean": f"{_HIGHPASS},{_NORMALIZE}",
     "clean_denoise": f"{_HIGHPASS},{_DENOISE},{_NORMALIZE}",
 }
+
+
+_DURATION = re.compile(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)")
+
+
+def probe_duration(src: Path) -> float | None:
+    """녹음 길이(초). 업로드 직후 화면에 길이를 보여주려고 STT 전에 잰다. 못 읽으면 None."""
+    result = subprocess.run(
+        [FFMPEG, "-hide_banner", "-i", str(src)], capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
+    match = _DURATION.search(result.stderr)
+    if not match:
+        return None
+    h, m, s = match.groups()
+    return int(h) * 3600 + int(m) * 60 + float(s)
 
 
 def preprocess(

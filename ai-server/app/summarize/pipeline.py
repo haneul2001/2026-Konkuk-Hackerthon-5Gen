@@ -65,7 +65,7 @@ def _ngrams(s: str, n: int = 4) -> set[str]:
     return {s[i : i + n] for i in range(len(s) - n + 1)}
 
 
-class _Grounder:
+class Grounder:
     def __init__(self, transcript: str):
         self.text = _norm(transcript)
         self.grams = _ngrams(self.text)
@@ -83,7 +83,7 @@ class _Grounder:
 
 def clean_announcements(items: list[dict], transcript: str) -> tuple[list[str], list[dict]]:
     """근거가 전사본에 있는 공지만 남기고 중복을 없앤다. (남은 공지, 버린 공지)"""
-    grounder = _Grounder(transcript)
+    grounder = Grounder(transcript)
     kept, dropped, seen = [], [], set()
     for item in items:
         if not grounder.is_grounded(item.get("evidence", "")):

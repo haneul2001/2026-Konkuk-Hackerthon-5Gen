@@ -1,67 +1,64 @@
-# 학습도우미 오디오 백엔드
+# 학습도우미 AI 서버
 
-녹음 업로드 → 전처리(ffmpeg) → STT(faster-whisper, 로컬 GPU + VAD) → LLM 요약 → DB 저장
+녹음 업로드 → 전처리(ffmpeg) → STT(faster-whisper, 로컬 GPU + VAD) → 요약·개념 추출(LLM) → 퀴즈 생성(LLM)
+
+studyapp(Express)이 `/api/lectures`, `/api/concepts`, `/api/quiz` 요청을 이 서버로 넘긴다. 연결 방법은 [INTEGRATION.md](INTEGRATION.md).
 
 ## 1. 설치 (처음 한 번)
 
+필요한 것: Python 3.11+, NVIDIA GPU(CUDA 12), [Ollama](https://ollama.com/download)
+
 ```bash
 python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt
-cp .env.example .env
-```
-
-기본 요약 모델은 로컬 Qwen이다. [Ollama](https://ollama.com/download)를 설치하고 모델을 받는다.
-
-```bash
+.venv\Scripts\pip install -r requirements.txt
+copy .env.example .env
 ollama pull qwen3:8b
 ```
 
-Claude/Gemini를 쓰려면 `.env`에 API 키를 넣고 `SUMMARY_PROVIDER`를 바꾼다.
-로컬 LLM으로 요약할 때는 GPU 메모리를 비우려고 Whisper를 내렸다가 다음 STT 때 다시 올린다.
+ffmpeg는 `imageio-ffmpeg`에 들어 있고, STT 모델(약 1.6GB)은 처음 실행할 때 자동으로 받는다.
+GPU가 없으면 `.env`에 `WHISPER_DEVICE=cpu`, `WHISPER_COMPUTE_TYPE=int8` (느림).
 
-ffmpeg는 `imageio-ffmpeg`에 포함돼 있고, STT 모델(약 1.6GB)은 처음 실행할 때 자동으로 받는다.
-
-## 2. 서버 실행
+## 2. 실행
 
 ```bash
-.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
 ```
 
-브라우저에서 http://localhost:8000/docs 를 열면 API를 직접 눌러보며 테스트할 수 있다.
+http://localhost:8000/docs 에서 API를 직접 눌러볼 수 있다.
+
+## 3. API
+
+응답 모양은 `studyapp/shared/types.ts`를 따르고, 실패하면 `{ "error": "이유" }`.
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/lectures` | multipart: `file`(필수), `title`, `terms`(과목명·용어), `preset`, `provider` → `{id}` |
-| GET | `/lectures` | 강의 목록 |
-| GET | `/lectures/{id}` | 상태(`queued → preprocessing → transcribing → summarizing → done/failed`), 진행률, 전사본, 요약 |
-| POST | `/lectures/{id}/summary?provider=` | 전사본으로 요약만 다시 만들기 (실패 재시도, 다른 LLM 비교) |
-| DELETE | `/lectures/{id}` | 삭제 |
-| POST | `/courses` | 과목 생성: `name`, `professor`, `terms`(용어집), `corrections`(`{"틀린": "맞는"}`) |
-| GET | `/courses`, `/courses/{id}` | 과목 목록·상세 |
-| PATCH | `/courses/{id}` | 과목 수정 (보낸 필드만, `terms`·`corrections`는 통째로 교체) |
-| POST | `/courses/{id}/corrections` | 교정 하나 추가 `{wrong, right}` → 다음 강의부터 자동 적용 |
+| POST | `/api/lectures` | multipart: `audio`(필수), `course`(과목 이름, 필수), `title`, `recordedAt`(YYYY-MM-DD) → 202 `Lecture` (status: processing) |
+| GET | `/api/lectures`, `/api/lectures/{id}` | `Lecture` + `stage`, `progress`, `error`, `overview`, `announcements` |
+| GET | `/api/lectures/{id}/audio-file` | 녹음 원본 (다시 듣기) |
+| GET | `/api/lectures/{id}/transcript` | 전사본과 시간 정보 |
+| POST | `/api/lectures/{id}/summary?provider=` | 요약만 다시 (개념·문제도 새로 만든다) |
+| DELETE | `/api/lectures/{id}` | 강의와 원본·개념·문제 삭제 |
+| GET | `/api/concepts?lecture=` | `Concept[]` (서재 개념 카드) |
+| POST | `/api/quiz` | `{ source: {kind, id, title?}, type, count, conceptIds? }` → `Quiz`. 누를 때마다 새로 생성, 틀린 문제는 가중치를 높여 다시 낸다 |
+| POST | `/api/reviews/{id}/quiz` | `{ lectureId, reason: wrong \| interval, count }` → 저장된 문제로 복습 퀴즈 |
+| POST | `/api/quiz/{id}/submit` | `{ results: [{questionId, correct}] }` → 출제 가중치·개념 숙련도 갱신, `graded` 반환 |
+| GET/POST/PATCH | `/api/courses…` | 과목 용어집·교정 사전 |
 
-강의를 올릴 때 `course_id`를 주면 과목 용어집이 STT `hotwords`(30초 구간마다 적용)와 요약 힌트로 쓰이고, 교정 사전이 STT 결과에 적용된다.
-용어집 효과는 `python -m scripts.vocab_test`로 측정할 수 있다.
+- 처리 상태: `queued → preprocessing → transcribing → summarizing → done / failed`. 2시간 녹음 기준 약 2~3분.
+- 퀴즈 생성은 15~45초 걸린다 (Qwen 로컬 기준).
+- 녹음 원본은 `data/audio/`, DB는 `data/app.db`(SQLite). 출시 때 `DATABASE_URL`만 PostgreSQL로 바꾸면 된다.
 
-- 업로드 원본과 전처리 파일은 처리 후 지운다(`KEEP_AUDIO_FILES=1`이면 보관). 전사본과 요약은 DB에 남는다.
-- DB는 `data/app.db`(SQLite). 출시 단계에서 `DATABASE_URL`을 PostgreSQL로 바꾸면 된다.
+## 4. 과목 용어집
 
-## 3. 요약 LLM 벤치마크
+`courses/<과목명>.txt` 에 한 줄에 하나씩 용어를, `틀린 표현 -> 맞는 표현` 으로 교정을 적는다.
+업로드할 때 `course`가 같은 이름이면 STT 힌트(30초 구간마다 적용)와 오인식 교정에 쓰인다. 저장하면 다음 강의부터 반영된다.
 
-```bash
-.venv/Scripts/python -m scripts.bench_summary                     # 키/모델이 준비된 제공자 전부
-.venv/Scripts/python -m scripts.bench_summary -p exaone qwen -n 3  # 골라서 3회 반복
-.venv/Scripts/python -m scripts.bench_summary --lecture-id <id>    # 실제 업로드한 강의 전사본으로
-```
-
-`bench/fixtures/*.json`(잡담·공지·STT 오류가 섞인 전사본)으로 개념 커버리지, 잡담 누출, 공지 추출, 속도, 비용을 채점한다.
-결과는 `data/bench/<시각>/report.md`와 제공자별 요약 JSON.
-
-## 4. 전처리 프리셋 비교
+## 5. 측정 스크립트
 
 ```bash
-.venv/Scripts/python -m scripts.compare 강의.m4a --start 600 --duration 600 --terms "자료구조, 힙"
+.venv\Scripts\python -m scripts.bench_summary -p qwen gemini --modes single chunked -n 3   # 요약 LLM 비교
+.venv\Scripts\python -m scripts.compare 강의.m4a --duration 600 --terms "과목 용어"         # 전처리 프리셋 비교
+.venv\Scripts\python -m scripts.vocab_test 강의.aac --clips 1410-1590 --terms "..." --check SRAM DRAM  # 용어집 효과
 ```
 
-`data/compare/<파일명>/`에 프리셋(`raw`/`clean`/`clean_denoise`)별 STT 결과와 wav가 저장된다.
+요약 LLM은 `.env`의 `SUMMARY_PROVIDER`로 바꾼다 (`qwen` 기본, `claude`, `gemini`, `exaone`). 퀴즈 생성도 같은 LLM을 쓴다.

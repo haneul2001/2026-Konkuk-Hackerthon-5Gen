@@ -60,7 +60,7 @@ _ANNOUNCEMENTS = {
 SUMMARY_SCHEMA = {
     "type": "object",
     "properties": {
-        "title": {"type": "string", "description": "이 강의 회차의 주제"},
+        "title": {"type": "string", "description": "이 강의 회차의 주제. 20자 이내의 짧은 명사구 (예: 해시 테이블)"},
         "overview": {"type": "string", "description": "강의 전체 흐름 2~3문장"},
         "concepts": _CONCEPTS,
         "announcements": _ANNOUNCEMENTS,
@@ -81,7 +81,7 @@ CHUNK_SCHEMA = {
 MERGE_SCHEMA = {
     "type": "object",
     "properties": {
-        "title": {"type": "string", "description": "이 강의 회차의 주제"},
+        "title": {"type": "string", "description": "이 강의 회차의 주제. 20자 이내의 짧은 명사구 (예: 해시 테이블)"},
         "overview": {"type": "string", "description": "강의 전체 흐름 2~3문장"},
         "concepts": _CONCEPTS,
     },
