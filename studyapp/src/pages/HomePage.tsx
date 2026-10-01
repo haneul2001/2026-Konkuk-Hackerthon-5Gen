@@ -117,7 +117,7 @@ export function HomePage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[15px] font-semibold">{r.lectureTitle}</p>
                     <p className="mt-0.5 text-[13px] text-primary-soft">
-                      {r.course} · {r.reason === 'wrong' ? '틀린 문제' : '잊기 전에'}
+                      {r.reason === 'wrong' ? '틀린 문제 다시 풀기' : '잊기 전에 다시 보기'}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm font-semibold tabular-nums">
@@ -171,11 +171,7 @@ export function HomePage() {
                     to={`/lectures/${l.id}`}
                     leading={<CourseBadge course={l.course} />}
                     title={l.title}
-                    meta={
-                      <>
-                        {l.course} · {formatDate(l.recordedAt)} · {l.durationMin}분
-                      </>
-                    }
+                    meta={`${l.durationMin}분 녹음`}
                     trailing={
                       l.status === 'processing' ? (
                         <Tag tone="accent">요약 중</Tag>
@@ -370,9 +366,4 @@ function formatToday() {
     day: 'numeric',
     weekday: 'long',
   }).format(new Date())
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`
 }

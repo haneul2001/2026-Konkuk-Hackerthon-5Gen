@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronRight, Folder as FolderIcon, FolderPlus, Search } from 'lucide-react'
+import { ChevronRight, Folder as FolderIcon, FolderPlus, Layers, Search } from 'lucide-react'
 import type { Concept, Folder, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { masteryLabel } from '../lib/mastery'
 import { LIBRARY_NAME } from '../lib/names'
 import {
   Button,
+  ButtonLink,
   Card,
   CourseBadge,
   EmptyState,
@@ -31,7 +32,9 @@ export function LibraryPage() {
   const [params, setParams] = useSearchParams()
   const tab: Tab = params.get('tab') === 'concepts' ? 'concepts' : 'recordings'
   const course = params.get('course') ?? ''
-  const q = params.get('q') ?? ''
+  const urlQ = params.get('q') ?? ''
+  // 입력창은 로컬 상태로 둔다. URL 값을 바로 value로 쓰면 라우터 갱신이 한 박자 늦어 한글 조합이 깨진다.
+  const [q, setQ] = useState(urlQ)
 
   const [lectures, setLectures] = useState<Lecture[] | null>(null)
   const [concepts, setConcepts] = useState<Concept[] | null>(null)
@@ -71,6 +74,7 @@ export function LibraryPage() {
       (!course || l.course === course) &&
       (!needle || `${l.title} ${l.course}`.toLowerCase().includes(needle)),
   )
+  const cardCount = (concepts ?? []).filter((c) => !course || c.course === course).length
   const shownConcepts = (concepts ?? []).filter(
     (c) =>
       (!course || c.course === course) &&
@@ -97,7 +101,10 @@ export function LibraryPage() {
         <input
           type="search"
           value={q}
-          onChange={(e) => update({ q: e.target.value })}
+          onChange={(e) => {
+            setQ(e.target.value)
+            update({ q: e.target.value })
+          }}
           placeholder={tab === 'concepts' ? '개념 이름이나 내용으로 찾기' : '강의 제목으로 찾기'}
           aria-label={`${LIBRARY_NAME}에서 찾기`}
           className="h-12 w-full rounded-xl border-2 border-line bg-surface pr-3.5 pl-11 text-base placeholder:text-muted/70 focus:border-primary focus:outline-none"
@@ -180,6 +187,19 @@ export function LibraryPage() {
         ))}
       </div>
 
+      {/* 큐카드 진입: 지금 고른 과목의 개념을 넘겨 본다 */}
+      {tab === 'concepts' && cardCount > 0 && (
+        <ButtonLink
+          to={course ? `/cards?course=${encodeURIComponent(course)}` : '/cards'}
+          variant="primary"
+          className="w-full"
+        >
+          <Layers className="size-5" aria-hidden />
+          {course || '전체'} 개념 큐카드로 외우기
+          <span className="tabular-nums opacity-80">{cardCount}장</span>
+        </ButtonLink>
+      )}
+
       {tab === 'recordings' ? (
         lectures === null ? (
           <ListSkeleton rows={4} />
@@ -201,8 +221,8 @@ export function LibraryPage() {
                     title={l.title}
                     meta={
                       <span className="tabular-nums">
-                        {formatDate(l.recordedAt)} · {l.durationMin}분
-                        {l.status === 'ready' && ` · 개념 ${countFor(concepts, l.id)}`}
+                        {l.durationMin}분 녹음
+                        {l.status === 'ready' && ` · 개념 ${countFor(concepts, l.id)}개`}
                       </span>
                     }
                     trailing={
@@ -234,7 +254,7 @@ export function LibraryPage() {
                   {c.summary}
                 </p>
                 <p className="mt-2.5 truncate text-xs font-medium text-muted">
-                  {c.course} · {c.lectureTitle}
+                  {c.lectureTitle} 강의
                 </p>
               </Link>
             </li>
@@ -317,9 +337,4 @@ function NoMatch() {
 
 function countFor(concepts: Concept[] | null, lectureId: string) {
   return concepts ? concepts.filter((c) => c.lectureId === lectureId).length : 0
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`
 }

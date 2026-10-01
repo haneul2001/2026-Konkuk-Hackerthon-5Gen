@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Check, Folder as FolderIcon, Pencil, Plus, Search, X } from 'lucide-react'
+import { Check, Folder as FolderIcon, Layers, Pencil, Plus, Search, X } from 'lucide-react'
 import type { Concept, Folder } from '../../shared/types'
 import { api } from '../api/client'
 import {
@@ -110,9 +110,15 @@ export function FolderPage() {
 
       <div className="space-y-2.5">
         {inFolder.length > 0 ? (
-          <ButtonLink to={`/quiz?folder=${folder.id}`} variant="primary" className="w-full">
-            이 폴더로 문제 풀기
-          </ButtonLink>
+          <>
+            <ButtonLink to={`/quiz?folder=${folder.id}`} variant="primary" className="w-full">
+              이 폴더로 문제 풀기
+            </ButtonLink>
+            <ButtonLink to={`/cards?folder=${folder.id}`} className="w-full">
+              <Layers className="size-5" aria-hidden />
+              큐카드로 외우기
+            </ButtonLink>
+          </>
         ) : null}
         <Button
           variant={inFolder.length ? 'secondary' : 'primary'}
@@ -140,7 +146,7 @@ export function FolderPage() {
                   </div>
                   <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-muted">{c.summary}</p>
                   <p className="mt-2 truncate text-xs font-medium text-muted">
-                    {c.course} · {c.lectureTitle}
+                    {c.lectureTitle} 강의
                   </p>
                 </div>
                 <button
@@ -321,7 +327,7 @@ function ConceptPicker({
                             {!filed.has(c.id) && <Tag tone="accent">미분류</Tag>}
                           </span>
                           <span className="mt-0.5 block truncate text-[13px] text-muted">
-                            {c.lectureTitle}
+                            {c.lectureTitle} 강의
                           </span>
                         </span>
                       </label>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Loader } from 'lucide-react'
+import { Layers, Loader } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
@@ -30,7 +30,6 @@ export function LecturePage() {
       <div className="flex items-start gap-3">
         <CourseBadge course={lecture.course} className="size-12" />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-muted">{lecture.course}</p>
           <h1 className="text-[22px] leading-tight font-bold text-balance">{lecture.title}</h1>
           <p className="mt-1.5 flex items-center gap-2 text-[13px] text-muted">
             {lecture.durationMin}분
@@ -64,14 +63,23 @@ export function LecturePage() {
             onChange={(key) => setParams({ tab: key }, { replace: true })}
           />
 
-          {tab === 'cards' && (
-            <Placeholder
-              title="숏폼 큐카드"
-              description="세로로 넘기는 카드. 한 장에 핵심 개념 하나. 끝까지 보면 XP 지급."
-              endpoint="GET /api/lectures/:id/cards"
-              owner="나"
-            />
-          )}
+          {tab === 'cards' &&
+            (concepts.length > 0 ? (
+              <Card className="space-y-4 p-4">
+                <div>
+                  <p className="text-[17px] font-bold">큐카드 {concepts.length}장</p>
+                  <p className="mt-1 text-[14px] text-muted">
+                    설명을 보고 개념을 떠올린 뒤, 뒤집어서 확인해요.
+                  </p>
+                </div>
+                <ButtonLink to={`/cards?lecture=${lecture.id}`} variant="primary" className="w-full">
+                  <Layers className="size-5" aria-hidden />
+                  큐카드 넘기기
+                </ButtonLink>
+              </Card>
+            ) : (
+              <p className="text-[15px] text-muted">이 강의에서 뽑힌 개념이 아직 없어요.</p>
+            ))}
           {tab === 'tts' && (
             <Placeholder
               title="요약 듣기(TTS)"
