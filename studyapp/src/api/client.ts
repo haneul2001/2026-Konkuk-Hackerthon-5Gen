@@ -107,6 +107,9 @@ export const api = {
   lectures: () => get<Lecture[]>('/api/lectures', mock.lectures),
   lecture: (id: string) =>
     get<Lecture | null>(`/api/lectures/${id}`, mock.lectures.find((l) => l.id === id) ?? null),
+  // 제목·과목·녹음한 날(YYYY-MM-DD) 바꾸기. 목으로 대체하지 않고 서버가 준 이유를 보여준다
+  updateLecture: (id: string, patch: { title?: string; course?: string; recordedAt?: string }) =>
+    send<Lecture | null>('PATCH', `/api/lectures/${id}`, patch, () => null, { strict: true }),
   // form: audio(파일), course, title?, recordedAt?(YYYY-MM-DD)
   uploadLecture: upload,
   league: () => get<LeagueEntry[]>('/api/league', mock.league),

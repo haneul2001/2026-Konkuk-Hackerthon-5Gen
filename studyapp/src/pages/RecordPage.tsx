@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileAudio, Mic } from 'lucide-react'
+import { localDate } from '../../shared/mock'
 import { api, ApiError } from '../api/client'
 import { LIBRARY_NAME } from '../lib/names'
 import { Button, Field, PageTitle, Placeholder, Section, Segmented } from '../components/ui'
@@ -63,7 +64,7 @@ export function RecordPage() {
           />
         </>
       ) : (
-        <UploadForm initialCourse={params.get('course') ?? ''} />
+        <UploadForm initialCourse={params.get('course') ?? ''} initialDate={params.get('date') ?? ''} />
       )}
 
       {mode === 'record' && (
@@ -91,11 +92,13 @@ export function RecordPage() {
   )
 }
 
-function UploadForm({ initialCourse }: { initialCourse: string }) {
+// 학습 탭 캘린더의 '+'에서 오면 녹음한 날(date)이 채워져 있다.
+function UploadForm({ initialCourse, initialDate }: { initialCourse: string; initialDate: string }) {
   const navigate = useNavigate()
   const [file, setFile] = useState<File | null>(null)
   const [course, setCourse] = useState(initialCourse)
   const [title, setTitle] = useState('')
+  const [date, setDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : localDate())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const ready = !!file && course.trim().length > 0
@@ -107,6 +110,7 @@ function UploadForm({ initialCourse }: { initialCourse: string }) {
     form.append('audio', file)
     form.append('course', course.trim())
     if (title.trim()) form.append('title', title.trim())
+    if (date) form.append('recordedAt', date)
     setBusy(true)
     setError('')
     try {
@@ -144,6 +148,15 @@ function UploadForm({ initialCourse }: { initialCourse: string }) {
         value={course}
         onChange={(e) => setCourse(e.target.value)}
         hint={`${LIBRARY_NAME}에서 과목별로 모아 보여줘요.`}
+      />
+      <Field
+        label="녹음한 날"
+        id="date-upload"
+        type="date"
+        value={date}
+        max={localDate()}
+        onChange={(e) => setDate(e.target.value)}
+        hint="학습 탭 캘린더에 이 날짜로 들어가요."
       />
       <Field
         label="강의 제목 (선택)"

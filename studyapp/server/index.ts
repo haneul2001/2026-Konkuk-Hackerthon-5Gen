@@ -96,6 +96,8 @@ app.get('/api/league', (_req, res) => res.json(league))
 app.post('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures/:id', (req, res) => forward(req, res))
+// 제목·과목·녹음한 날 바꾸기 (body: { title?, course?, recordedAt? }). 캘린더에서 날짜 옮기기에 쓴다
+app.patch('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
 // 학습 탭의 개념 카드. ?lecture=ID 로 강의별 필터.
 app.get('/api/concepts', (req, res) => forward(req, res))

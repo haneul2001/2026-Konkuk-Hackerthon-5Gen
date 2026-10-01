@@ -17,6 +17,7 @@ import {
 import type { Concept, Folder, Lecture, RecordingFolder } from '../../shared/types'
 import { cleanTag, type RecordingTagState } from '../../shared/recordingTags'
 import { api } from '../api/client'
+import { RecordingCalendar } from '../components/RecordingCalendar'
 import { masteryLabel } from '../lib/mastery'
 import { LIBRARY_NAME } from '../lib/names'
 import {
@@ -36,12 +37,12 @@ import {
 } from '../components/ui'
 import { cn } from '../lib/cn'
 
-// 학습 탭: 요약에서 뽑힌 개념 모음(기본) + 올린 녹음본 보관함.
+// 학습 탭: 요약에서 뽑힌 개념 모음(기본) · 녹음 캘린더 · 올린 녹음본 보관함.
 // 개념과 녹음 모두 사용자가 만든 폴더에 담는다. 개념 폴더로는 문제를 푼다.
 // 탭·과목·태그·검색어·페이지는 주소에 남겨서 뒤로 가기·공유 시 그대로 돌아오게 한다.
 // 녹음본은 최신순, 10개씩 페이지로 나눈다.
 
-type Tab = 'recordings' | 'concepts'
+type Tab = 'concepts' | 'calendar' | 'recordings'
 
 const PAGE_SIZE = 10
 
@@ -66,7 +67,8 @@ const recordingFolderOps: FolderOps<RecordingFolder> = {
 
 export function LibraryPage() {
   const [params, setParams] = useSearchParams()
-  const tab: Tab = params.get('tab') === 'recordings' ? 'recordings' : 'concepts'
+  const tabParam = params.get('tab')
+  const tab: Tab = tabParam === 'recordings' || tabParam === 'calendar' ? tabParam : 'concepts'
   const course = params.get('course') ?? ''
   const tag = tab === 'recordings' ? (params.get('tag') ?? '') : '' // 내가 만든 녹음 태그
   const page = Math.max(1, Number(params.get('page')) || 1)
@@ -147,8 +149,8 @@ export function LibraryPage() {
         }
       />
 
-      {/* 검색 */}
-      <div className="relative">
+      {/* 검색 (캘린더에선 없음) */}
+      <div className={cn('relative', tab === 'calendar' && 'hidden')}>
         <Search
           className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted"
           aria-hidden
@@ -171,203 +173,217 @@ export function LibraryPage() {
         value={tab}
         options={[
           ['concepts', '개념'],
+          ['calendar', '캘린더'],
           ['recordings', '녹음본'],
         ]}
         onChange={(t) => update({ tab: t })}
       />
 
-      {/* 내 폴더: 개념 탭은 개념 폴더, 녹음본 탭은 녹음 폴더 */}
-      <section className="space-y-3" aria-labelledby="folders-title">
-        <h2 id="folders-title" className="text-[17px] font-bold">
-          내 폴더
-        </h2>
-        {tab === 'concepts' ? (
-          folders === null ? (
-            <ListSkeleton rows={1} />
-          ) : (
-            <FolderGrid
-              key="concepts"
-              folders={folders}
-              unit="개념"
-              countOf={(f) => f.conceptIds.length}
-              linkOf={(f) => `/library/folders/${f.id}`}
-              ops={conceptFolderOps}
-              onChange={(u) => setFolders((prev) => prev && u(prev))}
-              onCreate={() => setCreating('concepts')}
-            />
-          )
-        ) : recFolders === null ? (
-          <ListSkeleton rows={1} />
-        ) : (
-          <FolderGrid
-            key="recordings"
-            folders={recFolders}
-            unit="녹음"
-            countOf={(f) => f.lectureIds.length}
-            linkOf={(f) => `/library/recording-folders/${f.id}`}
-            ops={recordingFolderOps}
-            onChange={(u) => setRecFolders((prev) => prev && u(prev))}
-            onCreate={() => setCreating('recordings')}
-          />
-        )}
-      </section>
-
-      <div className="flex items-baseline justify-between pt-1">
-        <h2 className="text-[17px] font-bold">{tab === 'concepts' ? '전체 개념' : '전체 녹음'}</h2>
-        {tab === 'concepts' && unfiled > 0 && (
-          <span className="text-[13px] text-accent-ink">폴더에 안 담긴 개념 {unfiled}개</span>
-        )}
-      </div>
-
-      {/* 과목·태그 필터. 가로로 넘친다. 한 번에 하나만 고른다 */}
-      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="과목·태그">
-        {['', ...courses].map((c) => (
-          <Chip
-            key={c || 'all'}
-            label={c || '전체'}
-            active={course === c && !tag}
-            onClick={() => update({ course: c, tag: '' })}
-          />
-        ))}
-        {tab === 'recordings' &&
-          recTags?.tags.map((t) => (
-            <Chip key={`#${t}`} label={`#${t}`} active={tag === t} onClick={() => update({ tag: t, course: '' })} />
-          ))}
-        {tab === 'recordings' && (
-          <button
-            type="button"
-            onClick={() => setManagingTags(true)}
-            className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full border-2 border-dashed border-line-strong px-4 text-sm font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <Plus className="size-4" strokeWidth={2.5} aria-hidden />
-            태그
-          </button>
-        )}
-      </div>
-
-      {/* 플래시카드 진입: 지금 고른 과목의 개념을 넘겨 본다 */}
-      {tab === 'concepts' && cardCount > 0 && (
-        <ButtonLink
-          to={course ? `/flashcards?course=${encodeURIComponent(course)}` : '/flashcards'}
-          variant="primary"
-          className="w-full"
-        >
-          <Layers className="size-5" aria-hidden />
-          {course || '전체'} 개념 플래시카드로 외우기
-          <span className="tabular-nums opacity-80">{cardCount}장</span>
-        </ButtonLink>
-      )}
-
-      {tab === 'recordings' ? (
+      {tab === 'calendar' ? (
         lectures === null ? (
           <ListSkeleton rows={4} />
-        ) : lectures.length === 0 ? (
-          <EmptyState
-            message="아직 올린 녹음이 없어요."
-            action={{ label: '첫 강의 녹음하기', to: '/record' }}
-          />
-        ) : shownLectures.length === 0 ? (
-          <NoMatch />
         ) : (
-          <>
-            <Card>
-              <ul className="divide-y-2 divide-line">
-                {shownLectures.map((l) => {
-                  const filed = (recFolders ?? []).some((f) => f.lectureIds.includes(l.id))
-                  const myTags = tagsOf(l.id)
-                  return (
-                    // 줄 전체는 강의로 가는 링크, 오른쪽 버튼은 따로(링크 안에 버튼을 넣지 않는다)
-                    <li key={l.id} className="flex items-center">
-                      <div className="min-w-0 flex-1">
-                        <Row
-                          to={`/lectures/${l.id}`}
-                          leading={<CourseBadge course={l.course} />}
-                          title={l.title}
-                          meta={
-                            <span className="tabular-nums">
-                              {l.durationMin}분 녹음
-                              {l.status === 'ready' && ` · 개념 ${countFor(concepts, l.id)}개`}
-                              {myTags.length > 0 && (
-                                <span className="text-primary"> · {myTags.map((t) => `#${t}`).join(' ')}</span>
-                              )}
-                            </span>
-                          }
-                          trailing={
-                            <>
-                              {l.status === 'processing' && <Tag tone="accent">요약 중</Tag>}
-                              {l.status === 'failed' && <Tag tone="danger">처리 실패</Tag>}
-                              {filed && <Tag tone="primary">담김</Tag>}
-                            </>
-                          }
-                        />
-                      </div>
-                      {l.status !== 'failed' && (
-                        <button
-                          type="button"
-                          aria-label={`${l.title} 폴더·태그 정리`}
-                          onClick={() => setFiling(l)}
-                          className="mr-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
-                        >
-                          <FolderPlus className="size-5" aria-hidden />
-                        </button>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            </Card>
-            {pageCount > 1 && (
-              <Pager
-                page={currentPage}
-                count={pageCount}
-                onGo={(n) => {
-                  update({ page: n })
-                  document.querySelector('main')?.scrollTo({ top: 0 })
-                }}
+          <RecordingCalendar
+            lectures={lectures}
+            onMoved={(updated) => setLectures((prev) => prev && prev.map((l) => (l.id === updated.id ? updated : l)))}
+          />
+        )
+      ) : (
+        <>
+          {/* 내 폴더: 개념 탭은 개념 폴더, 녹음본 탭은 녹음 폴더 */}
+          <section className="space-y-3" aria-labelledby="folders-title">
+            <h2 id="folders-title" className="text-[17px] font-bold">
+              내 폴더
+            </h2>
+            {tab === 'concepts' ? (
+              folders === null ? (
+                <ListSkeleton rows={1} />
+              ) : (
+                <FolderGrid
+                  key="concepts"
+                  folders={folders}
+                  unit="개념"
+                  countOf={(f) => f.conceptIds.length}
+                  linkOf={(f) => `/library/folders/${f.id}`}
+                  ops={conceptFolderOps}
+                  onChange={(u) => setFolders((prev) => prev && u(prev))}
+                  onCreate={() => setCreating('concepts')}
+                />
+              )
+            ) : recFolders === null ? (
+              <ListSkeleton rows={1} />
+            ) : (
+              <FolderGrid
+                key="recordings"
+                folders={recFolders}
+                unit="녹음"
+                countOf={(f) => f.lectureIds.length}
+                linkOf={(f) => `/library/recording-folders/${f.id}`}
+                ops={recordingFolderOps}
+                onChange={(u) => setRecFolders((prev) => prev && u(prev))}
+                onCreate={() => setCreating('recordings')}
               />
             )}
-          </>
-        )
-      ) : concepts === null ? (
-        <ListSkeleton rows={4} />
-      ) : shownConcepts.length === 0 ? (
-        <NoMatch />
-      ) : (
-        <ul className="space-y-2.5">
-          {shownConcepts.map((c) => (
-            <li key={c.id}>
-              <Link
-                to={`/lectures/${c.lectureId}?tab=text`}
-                className="press block cursor-pointer rounded-2xl border-2 border-line bg-surface p-4 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[16px] font-bold">{c.term}</p>
-                  <Tag tone={masteryLabel[c.mastery].tone}>{masteryLabel[c.mastery].text}</Tag>
-                </div>
-                <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-pretty text-muted">
-                  {c.summary}
-                </p>
-                <p className="mt-2.5 truncate text-xs font-medium text-muted">
-                  {c.lectureTitle} 강의
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+          </section>
 
-      <Placeholder
-        title={tab === 'recordings' ? '녹음 원본 저장소' : '개념 정리'}
-        description={
-          tab === 'recordings'
-            ? '올라온 녹음 파일을 스토리지에 보관하고 다시 듣기를 제공한다. 지금은 목록만 있다.'
-            : '요약 단계에서 핵심 개념을 뽑아 저장. 퀴즈 결과로 "익히는 중 → 외움" 갱신.'
-        }
-        endpoint={
-          tab === 'recordings' ? 'GET /api/lectures/:id/audio-file' : 'GET /api/concepts'
-        }
-        owner="나"
-      />
+          <div className="flex items-baseline justify-between pt-1">
+            <h2 className="text-[17px] font-bold">{tab === 'concepts' ? '전체 개념' : '전체 녹음'}</h2>
+            {tab === 'concepts' && unfiled > 0 && (
+              <span className="text-[13px] text-accent-ink">폴더에 안 담긴 개념 {unfiled}개</span>
+            )}
+          </div>
+
+          {/* 과목·태그 필터. 가로로 넘친다. 한 번에 하나만 고른다 */}
+          <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="과목·태그">
+            {['', ...courses].map((c) => (
+              <Chip
+                key={c || 'all'}
+                label={c || '전체'}
+                active={course === c && !tag}
+                onClick={() => update({ course: c, tag: '' })}
+              />
+            ))}
+            {tab === 'recordings' &&
+              recTags?.tags.map((t) => (
+                <Chip key={`#${t}`} label={`#${t}`} active={tag === t} onClick={() => update({ tag: t, course: '' })} />
+              ))}
+            {tab === 'recordings' && (
+              <button
+                type="button"
+                onClick={() => setManagingTags(true)}
+                className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full border-2 border-dashed border-line-strong px-4 text-sm font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <Plus className="size-4" strokeWidth={2.5} aria-hidden />
+                태그
+              </button>
+            )}
+          </div>
+
+          {/* 플래시카드 진입: 지금 고른 과목의 개념을 넘겨 본다 */}
+          {tab === 'concepts' && cardCount > 0 && (
+            <ButtonLink
+              to={course ? `/flashcards?course=${encodeURIComponent(course)}` : '/flashcards'}
+              variant="primary"
+              className="w-full"
+            >
+              <Layers className="size-5" aria-hidden />
+              {course || '전체'} 개념 플래시카드로 외우기
+              <span className="tabular-nums opacity-80">{cardCount}장</span>
+            </ButtonLink>
+          )}
+
+          {tab === 'recordings' ? (
+            lectures === null ? (
+              <ListSkeleton rows={4} />
+            ) : lectures.length === 0 ? (
+              <EmptyState
+                message="아직 올린 녹음이 없어요."
+                action={{ label: '첫 강의 녹음하기', to: '/record' }}
+              />
+            ) : shownLectures.length === 0 ? (
+              <NoMatch />
+            ) : (
+              <>
+                <Card>
+                  <ul className="divide-y-2 divide-line">
+                    {shownLectures.map((l) => {
+                      const filed = (recFolders ?? []).some((f) => f.lectureIds.includes(l.id))
+                      const myTags = tagsOf(l.id)
+                      return (
+                        // 줄 전체는 강의로 가는 링크, 오른쪽 버튼은 따로(링크 안에 버튼을 넣지 않는다)
+                        <li key={l.id} className="flex items-center">
+                          <div className="min-w-0 flex-1">
+                            <Row
+                              to={`/lectures/${l.id}`}
+                              leading={<CourseBadge course={l.course} />}
+                              title={l.title}
+                              meta={
+                                <span className="tabular-nums">
+                                  {l.durationMin}분 녹음
+                                  {l.status === 'ready' && ` · 개념 ${countFor(concepts, l.id)}개`}
+                                  {myTags.length > 0 && (
+                                    <span className="text-primary"> · {myTags.map((t) => `#${t}`).join(' ')}</span>
+                                  )}
+                                </span>
+                              }
+                              trailing={
+                                <>
+                                  {l.status === 'processing' && <Tag tone="accent">요약 중</Tag>}
+                                  {l.status === 'failed' && <Tag tone="danger">처리 실패</Tag>}
+                                  {filed && <Tag tone="primary">담김</Tag>}
+                                </>
+                              }
+                            />
+                          </div>
+                          {l.status !== 'failed' && (
+                            <button
+                              type="button"
+                              aria-label={`${l.title} 폴더·태그 정리`}
+                              onClick={() => setFiling(l)}
+                              className="mr-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
+                            >
+                              <FolderPlus className="size-5" aria-hidden />
+                            </button>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </Card>
+                {pageCount > 1 && (
+                  <Pager
+                    page={currentPage}
+                    count={pageCount}
+                    onGo={(n) => {
+                      update({ page: n })
+                      document.querySelector('main')?.scrollTo({ top: 0 })
+                    }}
+                  />
+                )}
+              </>
+            )
+          ) : concepts === null ? (
+            <ListSkeleton rows={4} />
+          ) : shownConcepts.length === 0 ? (
+            <NoMatch />
+          ) : (
+            <ul className="space-y-2.5">
+              {shownConcepts.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    to={`/lectures/${c.lectureId}?tab=text`}
+                    className="press block cursor-pointer rounded-2xl border-2 border-line bg-surface p-4 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-[16px] font-bold">{c.term}</p>
+                      <Tag tone={masteryLabel[c.mastery].tone}>{masteryLabel[c.mastery].text}</Tag>
+                    </div>
+                    <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-pretty text-muted">
+                      {c.summary}
+                    </p>
+                    <p className="mt-2.5 truncate text-xs font-medium text-muted">
+                      {c.lectureTitle} 강의
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <Placeholder
+            title={tab === 'recordings' ? '녹음 원본 저장소' : '개념 정리'}
+            description={
+              tab === 'recordings'
+                ? '올라온 녹음 파일을 스토리지에 보관하고 다시 듣기를 제공한다. 지금은 목록만 있다.'
+                : '요약 단계에서 핵심 개념을 뽑아 저장. 퀴즈 결과로 "익히는 중 → 외움" 갱신.'
+            }
+            endpoint={
+              tab === 'recordings' ? 'GET /api/lectures/:id/audio-file' : 'GET /api/concepts'
+            }
+            owner="나"
+          />
+        </>
+      )}
 
       {filing && recFolders && recTags && (
         <FileLectureSheet
