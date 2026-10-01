@@ -1,5 +1,8 @@
 import type {
   BoardComment,
+  CardSession,
+  CardSubmitResult,
+  FlashCard,
   BoardKind,
   BoardPost,
   Concept,
@@ -26,6 +29,7 @@ import * as folderStore from '../../shared/folders'
 import * as recFolders from '../../shared/recordingFolders'
 import * as recTags from '../../shared/recordingTags'
 import * as profile from '../../shared/profile'
+import * as cards from '../../shared/cards'
 import * as notices from '../../shared/notices'
 import * as quiz from '../../shared/quiz'
 
@@ -196,6 +200,21 @@ export const api = {
   // 두 폴더 순서 맞바꾸기. 바뀐 전체 목록이 온다
   swapFolders: (a: string, b: string) =>
     send<Folder[] | null>('POST', '/api/folders/swap', { a, b }, () => folderStore.swapFolders(a, b)),
+
+  // 플래시카드. 강의(녹음)는 AI 서버 카드, 서버가 없으면 개념으로 만든 카드
+  lectureCards: (lectureId: string) =>
+    get<FlashCard[]>(`/api/lectures/${lectureId}/cards`, cards.cardsFromConcepts(lectureId)),
+  startCardSession: (lectureId: string) =>
+    send<CardSession | null>('POST', `/api/lectures/${lectureId}/card-sessions`, {}, () =>
+      cards.startSession(lectureId),
+    ),
+  submitCardSession: (sessionId: string, results: { cardId: string; known: boolean }[]) =>
+    send<CardSubmitResult | { error: string }>('POST', `/api/card-sessions/${sessionId}/submit`, { results }, () =>
+      cards.submitSession(sessionId, results),
+    ),
+  // 개념 폴더·과목 플래시카드를 끝까지 넘겼을 때
+  finishCardSet: (cardCount: number) =>
+    send<{ xpGained: number }>('POST', '/api/card-sets/done', { cardCount }, () => cards.finishCardSet(cardCount)),
 
   // 강의 또는 폴더의 개념으로 문제를 만든다. AI 서버가 새로 만들어서 15~45초 걸린다.
   createQuiz: (source: Exclude<QuizSource, { kind: 'review' }>, type: QuizType, count: number) =>

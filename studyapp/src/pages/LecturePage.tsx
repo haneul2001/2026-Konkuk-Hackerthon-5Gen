@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CircleAlert, Layers, Loader, Megaphone } from 'lucide-react'
+import { AudioLines, CircleAlert, Layers, Loader, Megaphone } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
@@ -26,6 +26,7 @@ export function LecturePage() {
   // undefined: 불러오는 중, null: 없음
   const [lecture, setLecture] = useState<Lecture | null | undefined>(undefined)
   const [concepts, setConcepts] = useState<Concept[]>([])
+  const [cardCount, setCardCount] = useState(0) // AI 플래시카드 수(개념 수가 아니다)
   const status = lecture?.status
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export function LecturePage() {
   useEffect(() => {
     if (status === 'ready') {
       api.concepts().then((list) => setConcepts(list.filter((c) => c.lectureId === id)))
+      if (id) api.lectureCards(id).then((cards) => setCardCount(cards.length))
     }
   }, [id, status])
 
@@ -118,12 +120,12 @@ export function LecturePage() {
             </Card>
           )}
           {tab === 'quiz' &&
-            (concepts.length > 0 ? (
+            (cardCount > 0 ? (
               <Card className="space-y-4 p-4">
                 <div>
-                  <p className="text-[17px] font-bold">플래시카드 {concepts.length}장</p>
+                  <p className="text-[17px] font-bold">플래시카드 {cardCount}장</p>
                   <p className="mt-1 text-[14px] text-muted">
-                    설명을 보고 개념을 떠올린 뒤, 뒤집어서 확인해요.
+                    질문을 보고 답을 떠올린 뒤, 뒤집어서 확인해요. 끝까지 넘기면 장수만큼 XP.
                   </p>
                 </div>
                 <ButtonLink to={`/flashcards?lecture=${lecture.id}`} className="w-full">
@@ -134,6 +136,7 @@ export function LecturePage() {
             ) : (
               <p className="text-[15px] text-muted">이 강의에서 뽑힌 개념이 아직 없어요.</p>
             ))}
+          {tab === 'tts' && <OriginalAudio lectureId={lecture.id} />}
           {tab === 'tts' && (
             <Placeholder
               title="요약 듣기(TTS)"
@@ -211,6 +214,32 @@ function Processing({ lecture }: { lecture: Lecture }) {
       <ButtonLink to="/" className="mt-5">
         홈으로
       </ButtonLink>
+    </Card>
+  )
+}
+
+// 올린 녹음 원본 다시 듣기. 파일은 AI 서버가 스트리밍한다(GET /api/lectures/:id/audio-file).
+function OriginalAudio({ lectureId }: { lectureId: string }) {
+  const [failed, setFailed] = useState(false)
+  return (
+    <Card className="space-y-3 p-4">
+      <p className="flex items-center gap-1.5 text-[17px] font-bold">
+        <AudioLines className="size-5 text-primary" aria-hidden />
+        녹음 다시 듣기
+      </p>
+      {failed ? (
+        <p className="text-[14px] text-muted">녹음 파일을 불러오지 못했어요. AI 서버가 켜져 있는지 확인해 주세요.</p>
+      ) : (
+        <audio
+          controls
+          preload="metadata"
+          src={`/api/lectures/${lectureId}/audio-file`}
+          onError={() => setFailed(true)}
+          className="w-full"
+        >
+          이 브라우저는 오디오 재생을 지원하지 않아요.
+        </audio>
+      )}
     </Card>
   )
 }

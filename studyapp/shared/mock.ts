@@ -214,24 +214,9 @@ export const concepts: Concept[] = [
   },
 ]
 
-export const todayReviews: ReviewItem[] = [
-  {
-    id: 'rev_1',
-    lectureId: 'lec_2',
-    lectureTitle: '9/29 운영체제',
-    course: '운영체제',
-    reason: 'wrong',
-    questionCount: 3,
-  },
-  {
-    id: 'rev_2',
-    lectureId: 'lec_0',
-    lectureTitle: '9/16 자료구조',
-    course: '자료구조',
-    reason: 'interval',
-    questionCount: 5,
-  },
-]
+// 오늘 복습. 처음엔 비어 있고, 퀴즈에서 틀린 문제가 생기면 채워진다.
+// (예전 목업 복습은 AI 서버에 없는 강의라 눌러도 문제가 안 나와서 뺐다)
+export const todayReviews: ReviewItem[] = []
 
 export const league: LeagueEntry[] = [
   { rank: 1, name: '민준', xpThisWeek: 410 },

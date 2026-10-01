@@ -1,5 +1,5 @@
-import { Check, RotateCcw, X } from 'lucide-react'
-import type { Quiz, QuizSubmitResult } from '../../../shared/types'
+import { BookOpen, Check, ExternalLink, RotateCcw, X } from 'lucide-react'
+import type { Quiz, QuizSubmitResult, StudyResource } from '../../../shared/types'
 import { LIBRARY_NAME } from '../../lib/names'
 import { cn } from '../../lib/cn'
 import { Mascot } from '../Mascot'
@@ -7,6 +7,7 @@ import { Button, ButtonLink, Card } from '../ui'
 import type { Answer } from './QuizPlayer'
 
 // 결과 화면: 마스코트 한마디 + 점수·XP + 틀린 문제 다시 보기.
+// 틀린 문제에는 AI 서버가 붙여 준 그 개념의 공부 자료 링크를 "이 개념 다시 공부하기"로 보여준다.
 
 export function QuizResult({
   quiz,
@@ -67,8 +68,11 @@ export function QuizResult({
           <h2 className="text-[17px] font-bold">틀린 문제 {wrong.length}개</h2>
           <Card>
             <ul className="divide-y-2 divide-line">
-              {wrong.map((a) => {
+              {wrong.map((a, i) => {
                 const q = quiz.questions.find((x) => x.id === a.questionId)!
+                // 같은 개념을 여러 문제에서 틀렸으면 자료는 처음 한 번만
+                const firstOfConcept =
+                  wrong.findIndex((w) => quiz.questions.find((x) => x.id === w.questionId)?.conceptId === q.conceptId) === i
                 const right =
                   q.type === 'multiple' ? q.choices[q.answerIndex] : q.type === 'ox' ? (q.answer ? 'O' : 'X') : ''
                 return (
@@ -82,6 +86,7 @@ export function QuizResult({
                       <Check className="mt-0.5 size-3.5 shrink-0" strokeWidth={3} aria-hidden />
                       <span>정답: {right}</span>
                     </p>
+                    {firstOfConcept && (q.resources?.length ?? 0) > 0 && <Resources items={q.resources!} />}
                   </li>
                 )
               })}
@@ -107,6 +112,36 @@ export function QuizResult({
           </ButtonLink>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Resources({ items }: { items: StudyResource[] }) {
+  return (
+    <div className="mt-3 rounded-xl bg-bg px-3.5 py-3">
+      <p className="flex items-center gap-1.5 text-[13px] font-bold text-primary">
+        <BookOpen className="size-4" aria-hidden />이 개념 다시 공부하기
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {items.slice(0, 3).map((r) => (
+          <li key={r.url}>
+            <a
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-10 items-center gap-2 rounded-lg py-1 text-[14px] active:bg-line/60"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-1 font-semibold text-ink underline-offset-2 hover:underline">{r.title}</span>
+                <span className="block truncate text-[12px] text-muted">
+                  {r.kind === 'wikipedia' ? '위키백과' : r.source}
+                </span>
+              </span>
+              <ExternalLink className="size-4 shrink-0 text-muted" aria-hidden />
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

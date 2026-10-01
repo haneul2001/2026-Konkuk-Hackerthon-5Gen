@@ -17,6 +17,22 @@ import type {
 // 상태는 메모리의 목 데이터를 직접 고친다. DB가 붙으면 반영 부분만 바꾸면 된다.
 
 export const XP_PER_CORRECT = 10
+export const XP_PER_CARD = 1 // 플래시카드 한 세트를 끝까지 넘기면 카드 수만큼
+
+export function cardSetXp(cardCount: number) {
+  return Math.max(0, Math.min(100, Math.floor(cardCount))) * XP_PER_CARD
+}
+
+// XP를 더하고 리그 순위를 다시 매긴다.
+export function addXp(xp: number) {
+  me.xpTotal += xp
+  me.xpThisWeek += xp
+  const mine = league.find((e) => e.isMe)
+  if (mine) mine.xpThisWeek = me.xpThisWeek
+  league.sort((a, b) => b.xpThisWeek - a.xpThisWeek)
+  league.forEach((e, i) => (e.rank = i + 1))
+  if (mine) me.leagueRank = mine.rank
+}
 
 // 문제 은행을 평평하게 펴고, 문제 → 강의 연결을 기억해 둔다(오답·복습은 강의 단위라서).
 const allQuestions: QuizQuestion[] = Object.values(quizBank).flat()
@@ -25,10 +41,8 @@ const lectureOf = new Map<string, string>(
 )
 
 // 오답 기록: 강의 id → 틀린 문제 id. 홈의 "오늘 복습(틀린 문제)"이 여기서 나온다.
-// 목 데이터의 rev_1(운영체제 3문제)과 맞춰 둔다.
-const wrongByLecture = new Map<string, Set<string>>([
-  ['lec_2', new Set(['lec_2_m1', 'lec_2_o2', 'lec_2_m3'])],
-])
+// 처음엔 비어 있고, 퀴즈를 풀다 틀리면 생긴다.
+const wrongByLecture = new Map<string, Set<string>>()
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -168,14 +182,7 @@ export function submitQuiz(
     me.todaySolved += sub.results.length
   }
 
-  // XP와 리그 순위
-  me.xpTotal += xpGained
-  me.xpThisWeek += xpGained
-  const mine = league.find((e) => e.isMe)
-  if (mine) mine.xpThisWeek = me.xpThisWeek
-  league.sort((a, b) => b.xpThisWeek - a.xpThisWeek)
-  league.forEach((e, i) => (e.rank = i + 1))
-  if (mine) me.leagueRank = mine.rank
+  addXp(xpGained)
 
   // 끝낸 간격 복습은 목록에서 뺀다.
   if (sub.source.kind === 'review') {

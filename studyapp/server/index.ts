@@ -31,7 +31,8 @@ import {
 import { addTag, removeTag, setLectureTags, tagState } from '../shared/recordingTags'
 import { currentNotices } from '../shared/notices'
 import { folders, league, me, recordingFolders, todayReviews } from '../shared/mock'
-import { submitQuiz, type GradedResult } from '../shared/quiz'
+import { addXp, cardSetXp, submitQuiz, type GradedResult } from '../shared/quiz'
+import { finishCardSet } from '../shared/cards'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
 // XP·리그·연속 학습일·오늘 복습·폴더·게시판은 여기서 목 데이터로 처리한다.
@@ -99,6 +100,29 @@ app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
 // 학습 탭의 개념 카드. ?lecture=ID 로 강의별 필터.
 app.get('/api/concepts', (req, res) => forward(req, res))
 
+// ---- 플래시카드 (AI 서버) ----
+// 카드 목록, 한 세트 시작은 그대로 넘긴다.
+app.get('/api/lectures/:id/cards', (req, res) => forward(req, res))
+app.post('/api/lectures/:id/card-sessions', (req, res) => forward(req, res))
+// 제출: AI 서버가 라이트너 상자를 갱신하고, 세트를 끝까지 봤으면(finished) 여기서 카드 수만큼 XP를 준다.
+app.post('/api/card-sessions/:id/submit', async (req, res) => {
+  try {
+    const r = await fetch(`${AI}${req.originalUrl}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: req.body?.results ?? [] }),
+    })
+    const result = await r.json()
+    if (r.ok && result.finished) {
+      result.xpGained = cardSetXp(result.cardCount)
+      addXp(result.xpGained)
+    }
+    res.status(r.status).json(result)
+  } catch {
+    res.status(503).json({ error: 'AI 서버에 연결할 수 없어요' })
+  }
+})
+
 // ---- 학습 탭(폴더) ----
 // 개념 폴더: 사용자가 만들고 개념을 담는다. 폴더 단위로 퀴즈가 나온다.
 // 녹음 태그: 사용자가 만든 태그를 녹음에 단다. 응답은 항상 { tags, byLecture } 전체
@@ -155,6 +179,12 @@ app.patch('/api/folders/:id', (req, res) => {
 })
 app.delete('/api/folders/:id', (req, res) => {
   res.json(deleteFolder(req.params.id))
+})
+
+// 개념 폴더·과목 플래시카드는 AI 서버를 거치지 않는다. 끝까지 넘기면 카드 수만큼 XP
+app.post('/api/card-sets/done', (req, res) => {
+  // body: { cardCount }
+  res.json(finishCardSet(Number(req.body?.cardCount) || 0))
 })
 
 // ---- 퀴즈·복습 ----

@@ -150,6 +150,54 @@ export type Concept = {
   lectureTitle: string
   course: string
   mastery: 'new' | 'learning' | 'mastered' // 새 개념 | 익히는 중 | 외움 (퀴즈 결과로 갱신)
+  resources?: StudyResource[] // AI 서버가 붙여 주는 공부 자료 링크
+}
+
+// 개념 공부 자료 링크(위키백과·믿을 만한 블로그). 틀린 문제에서 "이 개념 다시 공부하기"로 보여준다.
+export type StudyResource = {
+  kind: string // 'wikipedia' | 'blog'
+  source: string // 'wikipedia-ko', 블로그 사이트 등
+  title: string
+  url: string
+  snippet: string | null
+}
+
+// ---- 플래시카드 ----
+// AI 서버가 강의마다 개념당 1~3장 만든다. 앞면 질문 → 뒷면 답·설명·AI 예시.
+// 반복은 라이트너 상자(box 1~5). 개념 폴더·과목처럼 여러 강의를 묶을 땐 개념으로 카드를 만든다.
+
+export type FlashCard = {
+  id: string
+  lectureId?: string
+  conceptId?: string
+  icon?: string // 이모지 하나
+  front: string // 앞면 질문
+  answer: string // 짧은 정답
+  explanation?: string // 강의 내용으로 쓴 설명
+  example?: string // AI가 덧붙인 비유·예시 (강의 내용과 구분해서 보여준다)
+  box?: number | null
+  dueAt?: string | null
+  // 화면에서만 쓰는 값: 개념으로 만든 카드인지(앞면 설명 → 뒷면 개념 이름), 어느 강의 것인지
+  kind?: 'ai' | 'concept'
+  from?: string
+}
+
+export type CardSession = {
+  id: string
+  lectureId: string
+  title: string
+  cards: FlashCard[]
+  dueCount: number
+}
+
+export type CardSubmitResult = {
+  sessionId: string
+  lectureId: string
+  finished: boolean // 세트를 끝까지 봤는지
+  cardCount: number
+  known: number
+  unknown: number
+  xpGained?: number // Express가 붙인다
 }
 
 export type QuizType = 'multiple' | 'ox' | 'essay'
@@ -178,6 +226,8 @@ type QuestionBase = {
   conceptId: string
   prompt: string
   explanation: string
+  retry?: boolean // 전에 틀려서 다시 낸 문제
+  resources?: StudyResource[] // 틀렸을 때 보여줄 그 개념의 공부 자료
 }
 
 export type MultipleQuestion = QuestionBase & {

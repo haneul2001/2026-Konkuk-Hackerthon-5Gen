@@ -118,7 +118,10 @@ export function QuizPlayer({
 
       {/* 문제 */}
       <div className="pt-4 pb-6">
-        <Tag tone="primary">{typeLabel[q.type]}</Tag>
+        <span className="flex gap-1.5">
+          <Tag tone="primary">{typeLabel[q.type]}</Tag>
+          {q.retry && <Tag tone="accent">다시 도전</Tag>}
+        </span>
         <h1 className="mt-3 text-[21px] leading-snug font-bold text-pretty">{q.prompt}</h1>
 
         <div className="mt-6">
