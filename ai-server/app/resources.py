@@ -33,6 +33,8 @@ _TIMEOUT = 15
 TRUSTED_SITES_FILE = BASE_DIR / "trusted_sites.txt"
 MAX_BLOGS_PER_CONCEPT = 2
 CANDIDATES_PER_CONCEPT = 6
+# 위키백과 문서를 고를 때 한 번에 보여줄 개념 수. 많이 몰아 주면 작은 모델이 개념과 후보를 섞어 고른다
+WIKI_PICK_BATCH = 5
 CACHE_SECONDS = 24 * 3600
 
 
@@ -119,6 +121,31 @@ _WIKI_PICK_SYSTEM = """너는 대학 강의 개념과 위키백과 문서가 같
 - 이름이 같아도 다른 분야의 문서(예: 컴퓨터구조 개념인데 웹 분석, 스포츠 문서)는 고르지 않는다.
 - 맞는 문서가 없거나 애매하면 0을 쓴다."""
 
+_WIKI_VERIFY_SYSTEM = """너는 위키백과 문서가 대학 강의 개념을 공부하는 데 맞는지 확인한다.
+먼저 문서가 다루는 주제를 한 줄로 쓴다.
+- 문서 주제가 강의 개념과 같거나, 강의 개념을 직접 포함해 설명하는 상위 주제면 match를 true로 한다 (예: INNER JOIN → Join (SQL)).
+- 강의 개념과 나란한 다른 주제(예: 히트율 → 캐시 교체 정책), 다른 분야(예: 블록 → 장난감 블록), 용어 모음·목록 문서면 false로 한다."""
+
+_WIKI_VERIFY_SCHEMA = {
+    "type": "object",
+    "properties": {"page_topic": {"type": "string"}, "match": {"type": "boolean"}},
+    "required": ["page_topic", "match"],
+    "additionalProperties": False,
+}
+
+
+def _verify_wiki(concept: dict, title: str, extract: str, course: str, provider: str) -> bool:
+    """여러 개념을 묶어 고르면 작은 모델이 엉뚱한 문서를 고르는 일이 있어, 고른 문서를 하나씩 다시 확인한다"""
+    user = (
+        f"강의 과목: {course or '미정'}\n강의 개념: {concept['term']} — {concept['summary'][:200]}\n\n"
+        f"문서 제목: {title.replace('#', ' › ')}\n문서 첫 문장: {extract[:250]}"
+    )
+    try:
+        return bool(call(provider, _WIKI_VERIFY_SYSTEM, user, _WIKI_VERIFY_SCHEMA).data.get("match"))
+    except Exception as e:
+        log.warning("wikipedia verify failed: %s", e)
+        return False
+
 
 def _wiki(params: dict) -> dict:
     return _get_json(f"{_EN_API}?{urllib.parse.urlencode({**params, 'format': 'json', 'formatversion': 2})}")
@@ -189,15 +216,22 @@ def _find_wikipedia(concepts: list[dict], terms: dict[str, dict], course: str, p
     if not blocks:
         return {}
 
-    picks = call(provider, _WIKI_PICK_SYSTEM, f"과목: {course or '미정'}\n\n" + "\n\n".join(blocks), _items_schema({"pick": {"type": "integer"}})).data["items"]
+    picks = []
+    for i in range(0, len(blocks), WIKI_PICK_BATCH):
+        user = f"과목: {course or '미정'}\n\n" + "\n\n".join(blocks[i : i + WIKI_PICK_BATCH])
+        picks += call(provider, _WIKI_PICK_SYSTEM, user, _items_schema({"pick": {"type": "integer"}})).data["items"]
+    by_id = {c["id"]: c for c in concepts}
     found: dict[str, list[dict]] = {}
     for pick in picks:
-        options = candidates.get(pick.get("conceptId"), [])
+        cid = pick.get("conceptId")
+        options = candidates.get(cid, [])
         n = pick.get("pick", 0)
-        if not isinstance(n, int) or not 1 <= n <= len(options):
+        if cid not in by_id or not isinstance(n, int) or not 1 <= n <= len(options):
             continue  # 후보 밖은 받지 않는다
         title = options[n - 1]
         page = pages[title.split("#")[0]]
+        if not _verify_wiki(by_id[cid], title, page["extract"], course, provider):
+            continue
         links = []
         if page["ko"]:
             links.append({"kind": "wikipedia", "source": "wikipedia-ko", "title": f"위키백과: {page['ko']}", "url": _wiki_url("ko", page["ko"]), "snippet": None})
