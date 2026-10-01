@@ -82,6 +82,9 @@ app.get('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
 // 녹음 다시 듣기 자막: [{ start, end, text }] (초 단위)
 app.get('/api/lectures/:id/transcript', (req, res) => forward(req, res))
+// 플래시카드(큐카드): ?lecture=ID 또는 ?concepts=id1,id2. 결과는 라이트너 상자로 저장된다
+app.get('/api/cards', (req, res) => forward(req, res))
+app.post('/api/cards/review', (req, res) => forward(req, res))
 // 서재의 개념 카드. ?lecture=ID 로 강의별 필터.
 app.get('/api/concepts', (req, res) => forward(req, res))
 

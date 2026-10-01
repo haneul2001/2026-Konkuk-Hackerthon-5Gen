@@ -16,6 +16,7 @@ import type {
   QuizSubmitResult,
   QuizType,
   ReviewItem,
+  StudyCard,
   TranscriptSegment,
   UserSummary,
 } from '../../shared/types'
@@ -98,6 +99,11 @@ export const api = {
     get<Lecture | null>(`/api/lectures/${id}`, mock.lectures.find((l) => l.id === id) ?? null),
   // form: audio(파일), course, title?, recordedAt?(YYYY-MM-DD)
   uploadLecture: upload,
+  // 플래시카드: 개념 묶음의 큐카드 (다시 볼 카드가 앞). 서버가 없으면 빈 배열 → 개념 카드로 대신 보여준다
+  cards: (conceptIds: string[]) =>
+    get<StudyCard[]>(`/api/cards?concepts=${encodeURIComponent(conceptIds.join(','))}`, []),
+  reviewCards: (results: { cardId: string; known: boolean }[]) =>
+    send<{ reviewed: number }>('POST', '/api/cards/review', { results }, () => ({ reviewed: 0 })),
   // 녹음 다시 듣기: 원본 오디오 주소와 시간이 붙은 자막. 목 데이터에는 녹음이 없다.
   audioUrl: (id: string) => `/api/lectures/${id}/audio-file`,
   transcript: (id: string) =>

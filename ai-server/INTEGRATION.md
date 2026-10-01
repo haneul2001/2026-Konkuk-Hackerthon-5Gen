@@ -163,3 +163,20 @@ ai-server  : .venv\Scripts\python -m uvicorn app.main:app --port 8000
 studyapp   : npm run server   (3001)
              npm run dev      (5173)
 ```
+
+## 추가된 것 (feature/listen-tts)
+
+이 브랜치에서 화면(studyapp)까지 같이 연결해 두었다.
+
+| 기능 | API | 화면 |
+| --- | --- | --- |
+| 요약 듣기(TTS) | 없음 (브라우저 Web Speech API) | 강의 › 듣기 › 요약 듣기 |
+| 녹음 다시 듣기 | `GET /api/lectures/:id/audio-file` (Range 지원), `GET /api/lectures/:id/transcript` | 강의 › 듣기 › 녹음 다시 듣기 |
+| 근거 듣기 | `Concept.evidence` `[{start, end, text}]` | 강의 › 전체 요약의 개념 아래 시간 버튼 → 녹음 그 위치 |
+| 다음 시간 예고 | `Lecture.preview` | 강의 › 전체 요약 |
+| 플래시카드 = 큐카드 | `GET /api/cards?concepts=id1,id2`, `POST /api/cards/review` | 플래시카드 화면 (질문 → 정답·설명·AI 예시). 큐카드가 없으면 개념 카드로 대신 |
+| 심화 문제 | `QuizQuestion.level` (`basic`·`advanced`), `aspect` | 퀴즈에 '심화' 태그 |
+| 문제 수 부족 안내 | `Quiz.notice` | 퀴즈 첫 문제 위 |
+
+- 큐카드 결과는 라이트너 상자(다시 볼 간격 0·1·3·7·14일)로 저장되고, 다음에 몰라요 카드가 먼저 나온다.
+- TODO(하늘): 요약 듣기 5분마다 XP, 플래시카드 한 바퀴 XP(`cards_done`), 오답에 `resources` 링크 표시, 목 데이터 복습 항목 정리.

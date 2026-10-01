@@ -111,9 +111,10 @@ export function LecturePage() {
             (concepts.length > 0 ? (
               <Card className="space-y-4 p-4">
                 <div>
-                  <p className="text-[17px] font-bold">플래시카드 {concepts.length}장</p>
+                  {/* 큐카드가 있으면 그 수, 없으면 개념 카드 수 */}
+                  <p className="text-[17px] font-bold">플래시카드 {lecture.cardCount || concepts.length}장</p>
                   <p className="mt-1 text-[14px] text-muted">
-                    설명을 보고 개념을 떠올린 뒤, 뒤집어서 확인해요.
+                    질문을 보고 답을 떠올린 뒤, 뒤집어서 확인해요. 몰라요 카드는 다음에 먼저 나와요.
                   </p>
                 </div>
                 <ButtonLink to={`/flashcards?lecture=${lecture.id}`} variant="primary" className="w-full">

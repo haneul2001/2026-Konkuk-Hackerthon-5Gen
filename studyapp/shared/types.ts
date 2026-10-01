@@ -155,6 +155,21 @@ export type Concept = {
   evidence?: TranscriptSegment[]
 }
 
+// 플래시카드(큐카드). AI 서버가 요약의 개념마다 1~3장 만든다. 앞면 질문 → 뒷면 정답·설명
+export type StudyCard = {
+  id: string
+  lectureId: string
+  conceptId: string
+  icon: string
+  front: string // 질문
+  answer: string
+  explanation: string // 강의 내용 기반 설명
+  example: string | null // AI가 덧붙인 비유·예시 (강의 내용과 구분해서 보여준다)
+  box: number | null // 라이트너 상자 1~5, 아직 안 본 카드는 null
+  term: string
+  lectureTitle: string
+}
+
 // 녹음 다시 듣기 자막 한 줄. start·end는 녹음 시작부터의 초
 export type TranscriptSegment = {
   start: number

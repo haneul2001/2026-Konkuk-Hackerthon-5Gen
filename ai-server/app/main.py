@@ -468,6 +468,31 @@ class CardSubmitIn(BaseModel):
     results: list[dict] = Field(description="[{cardId, known: true | false}]")
 
 
+class CardReviewIn(BaseModel):
+    results: list[dict] = Field(description="[{cardId, known: true | false}]")
+
+
+@app.get("/api/cards")
+def list_study_cards(lecture: str | None = None, concepts: str | None = None):
+    """플래시카드 화면용 카드. ?lecture=ID 또는 ?concepts=id1,id2 (폴더·과목), 없으면 전체.
+    다시 볼 때가 된 카드와 몰라요 카드가 앞에 온다."""
+    with SessionLocal() as db:
+        if lecture:
+            ids = list(db.scalars(select(Concept.id).where(Concept.lecture_id == lecture)))
+        elif concepts is not None:
+            ids = [c for c in concepts.split(",") if c]
+        else:
+            ids = None
+        return cards.cards_for(db, ids)
+
+
+@app.post("/api/cards/review")
+def review_study_cards(body: CardReviewIn):
+    """플래시카드 알아요/몰라요 결과로 라이트너 상자를 갱신한다."""
+    with SessionLocal.begin() as db:
+        return cards.review(db, body.results)
+
+
 @app.get("/api/lectures/{lecture_id}/cards")
 def get_cards(lecture_id: str):
     """강의의 큐카드 전체 (box: 라이트너 상자 1~5, 아직 안 본 카드는 null)"""
