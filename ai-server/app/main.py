@@ -24,7 +24,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
 from app import cards, config, resources, stt, vocab
-from app.evidence import find_evidence
+from app.evidence import find_evidence, mentioned_in
+from app.naming import normalize_names
 from app.audio import PRESETS, preprocess, probe_duration
 from app.db import Card, Concept, ConceptResource, Course, Lecture, Question, SessionLocal, init_db
 from app.quiz import service as quiz_service
@@ -127,16 +128,25 @@ def _save_summary(lecture_id: str, result) -> None:
     with SessionLocal.begin() as db:
         lec = db.get(Lecture, lecture_id)
         _delete_concepts(db, lecture_id)
-        for i, c in enumerate(result.summary["concepts"]):
+        segments = lec.segments or []
+        previews = result.summary.get("preview", [])
+        kept = []
+        for c in result.summary["concepts"]:
+            evidence = find_evidence(c["name"], segments)
+            # 예고만 한 내용을 개념으로도 만든 경우: 녹음에 근거가 없고 이름이 예고에 나오면 개념에서 뺀다
+            if not evidence and mentioned_in(c["name"], previews):
+                continue
+            kept.append(c)
             db.add(
                 Concept(
                     lecture_id=lecture_id,
-                    position=i,
+                    position=len(kept) - 1,
                     term=c["name"],
                     summary=c["explanation"],
-                    evidence=find_evidence(c["name"], lec.segments or []),
+                    evidence=evidence,
                 )
             )
+        result.summary["concepts"] = kept
         if lec.title_auto and result.summary.get("title"):
             week = lec.title.split(" — ")[0]
             lec.title = f"{week} — {result.summary['title']}"
@@ -164,6 +174,28 @@ def _attach_resources(lecture_id: str, provider: str) -> None:
                     db.add(ConceptResource(concept_id=cid, position=i, **r))
 
 
+def _normalize_concept_names(lecture_id: str, provider: str) -> None:
+    """개념 이름을 과목 용어집의 표준 용어로 맞춘다. 근거는 바꾸기 전 이름(강의 표현)까지 함께 찾는다."""
+    with SessionLocal() as db:
+        lec = db.get(Lecture, lecture_id)
+        course = db.get(Course, lec.course_id) if lec.course_id else None
+        vocabulary = _course_vocab(course)[0] if course else []
+        concepts = db.scalars(select(Concept).where(Concept.lecture_id == lecture_id)).all()
+        items = [{"id": c.id, "term": c.term, "summary": c.summary} for c in concepts]
+    renamed = normalize_names(items, vocabulary, provider)
+    if not renamed:
+        return
+    with SessionLocal.begin() as db:
+        segments = db.get(Lecture, lecture_id).segments or []
+        for cid, new in renamed.items():
+            c = db.get(Concept, cid)
+            old = c.term
+            found = {e["start"]: e for e in find_evidence(new, segments) + find_evidence(old, segments)}
+            c.evidence = sorted(found.values(), key=lambda e: e["start"])[:3]
+            c.summary = f"{c.summary} (강의에서는 '{old}'(이)라고 했어요.)"
+            c.term = new
+
+
 def _make_cards(lecture_id: str, provider: str) -> None:
     with SessionLocal.begin() as db:
         cards.generate_cards(db, lecture_id, provider)
@@ -176,7 +208,8 @@ def _summarize_step(lecture_id: str, transcript: str, terms: str | None, provide
         stt.unload_model()
     _save_summary(lecture_id, summarize(transcript, terms, provider))
     # 큐카드와 자료 링크는 부가 단계라 실패해도 강의는 ready로 둔다 (각각 다시 만드는 API가 있다)
-    for name, step in (("cards", _make_cards), ("resources", _attach_resources)):
+    # 이름 맞추기 → 큐카드·자료 순서 (큐카드와 자료 링크가 고친 이름을 쓰게)
+    for name, step in (("naming", _normalize_concept_names), ("cards", _make_cards), ("resources", _attach_resources)):
         try:
             step(lecture_id, provider)
         except Exception as e:
@@ -247,6 +280,7 @@ def _lecture_out(db: Session, lec: Lecture) -> dict:
         "error": lec.error,
         "overview": summary.get("overview"),
         "announcements": summary.get("announcements", []),
+        "preview": summary.get("preview", []),  # 다음 시간 예고 (개념으로 만들지 않은 것)
     }
 
 

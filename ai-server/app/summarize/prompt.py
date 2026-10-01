@@ -9,6 +9,8 @@ _RULES = """규칙:
 - 전사본에 없는 내용을 지어내지 않는다. 교수가 말하지 않은 수치, 예시, 정의, 용어를 덧붙이지 않는다. 비유로 설명했다면 그 비유를 그대로 살린다.
 - 교수가 "시험에 나온다", "헷갈린다", "주의해야 한다"처럼 강조한 내용과 공식·수식은 반드시 해당 개념에 포함한다.
 - 개념 하나는 복습 카드 한 장 분량(2~4문장)으로, 정의와 교수가 강조한 포인트를 담는다.
+- 교수가 "다음 시간에 하겠다", "뒤에서 나온다"처럼 이름만 꺼내거나 예고만 한 내용은 개념으로 만들지 않는다. 대신 preview에 한 문장으로 담는다. 설명이 실제로 이어진 것만 개념이다.
+- 개념 이름은 교수가 쓴 용어를 쓴다. 교수가 비유(예: "다인실")로만 말했으면 그 비유를 함께 쓰고, 확실하지 않은 다른 전문 용어로 바꾸지 않는다.
 - 공지(announcements)는 시험·과제·휴강·일정처럼 교수가 실제로 말한 수업 운영 정보만 담는다. 날짜·마감·감점 규칙까지 쓴다. 각 공지의 evidence에는 그 공지가 나온 전사본 문장을 고치지 말고 그대로 옮긴다. 공지가 없으면 빈 배열로 둔다. 공지를 concepts에 넣지 않는다.
 - 한국어로 쓴다."""
 
@@ -17,7 +19,7 @@ SYSTEM_PROMPT = f"""너는 대학생의 복습을 돕는 조교다. 강의 녹�
 {_RULES}"""
 
 CHUNK_SYSTEM_PROMPT = f"""너는 대학생의 복습을 돕는 조교다. 긴 강의 전사본을 여러 구간으로 나눴고, 지금은 그중 한 구간을 받는다.
-이 구간에서 다룬 핵심 개념과 공지만 뽑는다. 앞뒤 구간에서 이어지는 설명이 잘려 있을 수 있으니, 이 구간에 실제로 있는 내용만 쓴다.
+이 구간에서 다룬 핵심 개념과 공지, 예고만 뽑는다. 앞뒤 구간에서 이어지는 설명이 잘려 있을 수 있으니, 이 구간에 실제로 있는 내용만 쓴다.
 
 {_RULES}"""
 
@@ -56,6 +58,12 @@ _ANNOUNCEMENTS = {
     },
 }
 
+_PREVIEW = {
+    "type": "array",
+    "items": {"type": "string"},
+    "description": "다음 시간 등으로 예고만 하고 설명하지 않은 내용. 없으면 빈 배열",
+}
+
 # 한 번에 요약할 때 LLM 출력 스키마
 SUMMARY_SCHEMA = {
     "type": "object",
@@ -64,16 +72,17 @@ SUMMARY_SCHEMA = {
         "overview": {"type": "string", "description": "강의 전체 흐름 2~3문장"},
         "concepts": _CONCEPTS,
         "announcements": _ANNOUNCEMENTS,
+        "preview": _PREVIEW,
     },
-    "required": ["title", "overview", "concepts", "announcements"],
+    "required": ["title", "overview", "concepts", "announcements", "preview"],
     "additionalProperties": False,
 }
 
 # 구간별 요약 출력 스키마
 CHUNK_SCHEMA = {
     "type": "object",
-    "properties": {"concepts": _CONCEPTS, "announcements": _ANNOUNCEMENTS},
-    "required": ["concepts", "announcements"],
+    "properties": {"concepts": _CONCEPTS, "announcements": _ANNOUNCEMENTS, "preview": _PREVIEW},
+    "required": ["concepts", "announcements", "preview"],
     "additionalProperties": False,
 }
 

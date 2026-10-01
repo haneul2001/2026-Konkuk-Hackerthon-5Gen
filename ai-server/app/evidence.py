@@ -65,3 +65,9 @@ def find_evidence(term: str, segments: list[dict], limit: int = MAX_EVIDENCE) ->
         if len(picked) >= limit:
             break
     return sorted(picked, key=lambda p: p["start"])
+
+
+def mentioned_in(term: str, texts: list[str]) -> bool:
+    """개념 이름의 단어가 모두 들어간 글이 있는지 (예고 문장에 그 개념이 나오는지)"""
+    tokens = _tokens(term)
+    return bool(tokens) and any(all(t in _norm(text) for t in tokens) for text in texts)

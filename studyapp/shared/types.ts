@@ -15,6 +15,7 @@ export type Lecture = {
   error?: string | null // status가 failed일 때 이유
   overview?: string | null // 강의 개요 2~3문장
   announcements?: string[] // 시험·과제 공지 (전사본에 근거가 있는 것만)
+  preview?: string[] // 다음 시간 예고 (이번 강의에서 설명하지 않아 개념으로 만들지 않은 것)
 }
 
 export type ReviewItem = {

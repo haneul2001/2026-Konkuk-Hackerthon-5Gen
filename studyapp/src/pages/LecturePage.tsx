@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CircleAlert, Layers, Loader, Megaphone, Play } from 'lucide-react'
+import { CalendarClock, CircleAlert, Layers, Loader, Megaphone, Play } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
@@ -158,6 +158,19 @@ export function LecturePage() {
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] leading-relaxed">
                 {lecture.announcements!.map((a) => (
                   <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {tab === 'text' && (lecture.preview?.length ?? 0) > 0 && (
+            <Card className="p-4">
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
+                <CalendarClock className="size-4" aria-hidden />
+                다음 시간 예고
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-pretty">
+                {lecture.preview!.map((p) => (
+                  <li key={p}>{p}</li>
                 ))}
               </ul>
             </Card>
