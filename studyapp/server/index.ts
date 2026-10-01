@@ -31,7 +31,7 @@ import {
 import { addTag, removeTag, setLectureTags, tagState } from '../shared/recordingTags'
 import { currentNotices } from '../shared/notices'
 import { folders, league, me, recordingFolders, todayReviews } from '../shared/mock'
-import { addXp, cardSetXp, submitQuiz, type GradedResult } from '../shared/quiz'
+import { submitQuiz, type GradedResult } from '../shared/quiz'
 import { finishCardSet } from '../shared/cards'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
@@ -51,11 +51,14 @@ app.use(express.json())
 async function forward(req: express.Request, res: express.Response, body?: unknown) {
   try {
     const isJson = body !== undefined || !!req.is('application/json')
+    const headers: Record<string, string> = isJson
+      ? { 'Content-Type': 'application/json' }
+      : { 'Content-Type': req.headers['content-type'] ?? '' }
+    // 녹음 다시 듣기에서 중간으로 넘길 수 있게 구간 요청을 그대로 넘긴다 (206 Partial Content)
+    if (req.headers.range) headers.Range = req.headers.range
     const init: RequestInit & { duplex: 'half' } = {
       method: req.method,
-      headers: isJson
-        ? { 'Content-Type': 'application/json' }
-        : { 'Content-Type': req.headers['content-type'] ?? '' },
+      headers,
       body:
         req.method === 'GET'
           ? undefined
@@ -99,31 +102,14 @@ app.get('/api/lectures/:id', (req, res) => forward(req, res))
 // 제목·과목·녹음한 날 바꾸기 (body: { title?, course?, recordedAt? }). 캘린더에서 날짜 옮기기에 쓴다
 app.patch('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
+// 녹음 다시 듣기 자막: [{ start, end, text }] (초 단위)
+app.get('/api/lectures/:id/transcript', (req, res) => forward(req, res))
+// 플래시카드(큐카드): ?lecture=ID 또는 ?concepts=id1,id2. 알아요/몰라요는 review로 라이트너 상자에 저장된다
+app.get('/api/cards', (req, res) => forward(req, res))
+app.post('/api/cards/review', (req, res) => forward(req, res))
 // 학습 탭의 개념 카드. ?lecture=ID 로 강의별 필터.
 app.get('/api/concepts', (req, res) => forward(req, res))
 
-// ---- 플래시카드 (AI 서버) ----
-// 카드 목록, 한 세트 시작은 그대로 넘긴다.
-app.get('/api/lectures/:id/cards', (req, res) => forward(req, res))
-app.post('/api/lectures/:id/card-sessions', (req, res) => forward(req, res))
-// 제출: AI 서버가 라이트너 상자를 갱신하고, 세트를 끝까지 봤으면(finished) 여기서 카드 수만큼 XP를 준다.
-app.post('/api/card-sessions/:id/submit', async (req, res) => {
-  try {
-    const r = await fetch(`${AI}${req.originalUrl}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ results: req.body?.results ?? [] }),
-    })
-    const result = await r.json()
-    if (r.ok && result.finished) {
-      result.xpGained = cardSetXp(result.cardCount)
-      addXp(result.xpGained)
-    }
-    res.status(r.status).json(result)
-  } catch {
-    res.status(503).json({ error: 'AI 서버에 연결할 수 없어요' })
-  }
-})
 
 // ---- 학습 탭(폴더) ----
 // 개념 폴더: 사용자가 만들고 개념을 담는다. 폴더 단위로 퀴즈가 나온다.
@@ -183,7 +169,7 @@ app.delete('/api/folders/:id', (req, res) => {
   res.json(deleteFolder(req.params.id))
 })
 
-// 개념 폴더·과목 플래시카드는 AI 서버를 거치지 않는다. 끝까지 넘기면 카드 수만큼 XP
+// 플래시카드 한 세트를 끝까지 넘기면 카드 수만큼 XP (녹음·개념 폴더·과목 공통)
 app.post('/api/card-sets/done', (req, res) => {
   // body: { cardCount }
   res.json(finishCardSet(Number(req.body?.cardCount) || 0))

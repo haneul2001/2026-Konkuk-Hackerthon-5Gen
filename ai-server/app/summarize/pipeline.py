@@ -126,11 +126,12 @@ def summarize(
         model = r.model
         title, overview, concepts = r.data["title"], r.data["overview"], r.data["concepts"]
         raw_announcements = r.data["announcements"]
+        previews = r.data.get("preview", [])
         chunk_count = 1
     else:
         chunks = split_chunks(transcript)
         chunk_count = len(chunks)
-        chunk_concepts, raw_announcements = [], []
+        chunk_concepts, raw_announcements, previews = [], [], []
         for i, chunk in enumerate(chunks, 1):
             if on_progress:
                 on_progress(i - 1, len(chunks) + 1)
@@ -143,6 +144,7 @@ def summarize(
             _add_usage(acc, r)
             chunk_concepts.append(r.data["concepts"])
             raw_announcements += r.data["announcements"]
+            previews += r.data.get("preview", [])
 
         if on_progress:
             on_progress(len(chunks), len(chunks) + 1)
@@ -155,7 +157,14 @@ def summarize(
     return SummaryResult(
         provider=provider,
         model=model,
-        summary={"title": title, "overview": overview, "concepts": concepts, "announcements": announcements},
+        summary={
+            "title": title,
+            "overview": overview,
+            "concepts": concepts,
+            "announcements": announcements,
+            # 예고만 하고 설명하지 않은 내용 (개념으로 만들지 않는다)
+            "preview": list(dict.fromkeys(p.strip() for p in previews if p.strip())),
+        },
         latency_sec=acc["latency"],
         input_tokens=acc["in"],
         output_tokens=acc["out"],

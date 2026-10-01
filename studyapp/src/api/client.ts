@@ -1,8 +1,5 @@
 import type {
   BoardComment,
-  CardSession,
-  CardSubmitResult,
-  FlashCard,
   BoardKind,
   BoardPost,
   Concept,
@@ -20,6 +17,8 @@ import type {
   QuizSubmitResult,
   QuizType,
   ReviewItem,
+  StudyCard,
+  TranscriptSegment,
   UserSummary,
 } from '../../shared/types'
 import * as mock from '../../shared/mock'
@@ -112,6 +111,15 @@ export const api = {
     send<Lecture | null>('PATCH', `/api/lectures/${id}`, patch, () => null, { strict: true }),
   // form: audio(파일), course, title?, recordedAt?(YYYY-MM-DD)
   uploadLecture: upload,
+  // 플래시카드: 개념 묶음의 큐카드 (다시 볼 카드가 앞). 서버가 없으면 빈 배열 → 개념 카드로 대신 보여준다
+  cards: (conceptIds: string[]) =>
+    get<StudyCard[]>(`/api/cards?concepts=${encodeURIComponent(conceptIds.join(','))}`, []),
+  reviewCards: (results: { cardId: string; known: boolean }[]) =>
+    send<{ reviewed: number }>('POST', '/api/cards/review', { results }, () => ({ reviewed: 0 })),
+  // 녹음 다시 듣기: 원본 오디오 주소와 시간이 붙은 자막. 목 데이터에는 녹음이 없다.
+  audioUrl: (id: string) => `/api/lectures/${id}/audio-file`,
+  transcript: (id: string) =>
+    get<{ text: string | null; segments: TranscriptSegment[] } | null>(`/api/lectures/${id}/transcript`, null),
   league: () => get<LeagueEntry[]>('/api/league', mock.league),
 
   // 게시판
@@ -204,18 +212,9 @@ export const api = {
   swapFolders: (a: string, b: string) =>
     send<Folder[] | null>('POST', '/api/folders/swap', { a, b }, () => folderStore.swapFolders(a, b)),
 
-  // 플래시카드. 강의(녹음)는 AI 서버 카드, 서버가 없으면 개념으로 만든 카드
-  lectureCards: (lectureId: string) =>
-    get<FlashCard[]>(`/api/lectures/${lectureId}/cards`, cards.cardsFromConcepts(lectureId)),
-  startCardSession: (lectureId: string) =>
-    send<CardSession | null>('POST', `/api/lectures/${lectureId}/card-sessions`, {}, () =>
-      cards.startSession(lectureId),
-    ),
-  submitCardSession: (sessionId: string, results: { cardId: string; known: boolean }[]) =>
-    send<CardSubmitResult | { error: string }>('POST', `/api/card-sessions/${sessionId}/submit`, { results }, () =>
-      cards.submitSession(sessionId, results),
-    ),
-  // 개념 폴더·과목 플래시카드를 끝까지 넘겼을 때
+  // 녹음 하나의 큐카드(다시 볼 카드·몰라요 카드가 앞). 서버가 없으면 빈 배열 → 개념 카드로 대신한다
+  lectureCards: (lectureId: string) => get<StudyCard[]>(`/api/cards?lecture=${encodeURIComponent(lectureId)}`, []),
+  // 플래시카드 한 세트를 끝까지 넘겼을 때(카드 수만큼 XP)
   finishCardSet: (cardCount: number) =>
     send<{ xpGained: number }>('POST', '/api/card-sets/done', { cardCount }, () => cards.finishCardSet(cardCount)),
 

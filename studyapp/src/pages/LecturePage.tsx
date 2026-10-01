@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { AudioLines, CircleAlert, Layers, Loader, Megaphone } from 'lucide-react'
+import { CalendarClock, CircleAlert, Layers, Loader, Megaphone, Play } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
+import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
+import { clock } from '../lib/time'
 
 // 강의 상세: 듣기(TTS) · 퀴즈(문제 풀기·플래시카드) · 전체 요약 탭. 기본은 듣기.
 // 업로드 직후엔 처리 중이라 몇 초마다 다시 불러와 단계·진행률을 보여준다.
@@ -23,6 +25,9 @@ export function LecturePage() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
   const tab: Tab = params.get('tab') === 'quiz' || params.get('tab') === 'text' ? (params.get('tab') as Tab) : 'tts'
+  const listen = params.get('listen') === 'recording' ? 'recording' : 'summary'
+  // 개념의 '근거 듣기'에서 넘어오면 녹음의 그 위치(초)
+  const startAt = params.has('t') ? Number(params.get('t')) : undefined
   // undefined: 불러오는 중, null: 없음
   const [lecture, setLecture] = useState<Lecture | null | undefined>(undefined)
   const [concepts, setConcepts] = useState<Concept[]>([])
@@ -120,10 +125,10 @@ export function LecturePage() {
             </Card>
           )}
           {tab === 'quiz' &&
-            (cardCount > 0 ? (
+            (cardCount + concepts.length > 0 ? (
               <Card className="space-y-4 p-4">
                 <div>
-                  <p className="text-[17px] font-bold">플래시카드 {cardCount}장</p>
+                  <p className="text-[17px] font-bold">플래시카드 {cardCount || concepts.length}장</p>
                   <p className="mt-1 text-[14px] text-muted">
                     질문을 보고 답을 떠올린 뒤, 뒤집어서 확인해요. 끝까지 넘기면 장수만큼 XP.
                   </p>
@@ -136,14 +141,24 @@ export function LecturePage() {
             ) : (
               <p className="text-[15px] text-muted">이 강의에서 뽑힌 개념이 아직 없어요.</p>
             ))}
-          {tab === 'tts' && <OriginalAudio lectureId={lecture.id} />}
           {tab === 'tts' && (
-            <Placeholder
-              title="요약 듣기(TTS)"
-              description="요약을 음성으로 재생. 5분마다 XP 지급, 하루 상한 있음."
-              endpoint="GET /api/lectures/:id/audio"
-              owner="나"
-            />
+            <>
+              <Segmented
+                label="듣기 방식"
+                value={listen}
+                options={[
+                  ['summary', '요약 듣기'],
+                  ['recording', '녹음 다시 듣기'],
+                ]}
+                onChange={(key) => setParams({ tab: 'tts', listen: key }, { replace: true })}
+              />
+              {/* TODO: 요약 듣기 5분마다 XP (POST /api/xp tts_5min) */}
+              {listen === 'summary' ? (
+                <SummaryPlayer lecture={lecture} concepts={concepts} />
+              ) : (
+                <RecordingPlayer lectureId={lecture.id} startAt={startAt} />
+              )}
+            </>
           )}
           {tab === 'text' && lecture.overview && (
             <Card className="p-4">
@@ -164,6 +179,19 @@ export function LecturePage() {
               </ul>
             </Card>
           )}
+          {tab === 'text' && (lecture.preview?.length ?? 0) > 0 && (
+            <Card className="p-4">
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
+                <CalendarClock className="size-4" aria-hidden />
+                다음 시간 예고
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-pretty">
+                {lecture.preview!.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {tab === 'text' && concepts.length > 0 && (
             <Card>
               <p className="border-b-2 border-line px-4 py-2.5 text-[13px] font-semibold text-muted">
@@ -176,6 +204,10 @@ export function LecturePage() {
                     <p className="mt-1 text-[14px] leading-relaxed text-pretty text-muted">
                       {c.summary}
                     </p>
+                    <Evidence
+                      concept={c}
+                      onListen={(sec) => setParams({ tab: 'tts', listen: 'recording', t: String(Math.floor(sec)) })}
+                    />
                   </li>
                 ))}
               </ul>
@@ -191,6 +223,36 @@ export function LecturePage() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// 개념의 근거: 녹음에서 그 개념을 말한 시간. 누르면 녹음 다시 듣기의 그 위치로 간다.
+// 못 찾았으면 AI가 정리하며 바꾼 말일 수 있다고 알려, 학생이 요약을 그대로 믿지 않게 한다.
+function Evidence({ concept, onListen }: { concept: Concept; onListen: (sec: number) => void }) {
+  if (!concept.evidence) return null
+  if (concept.evidence.length === 0) {
+    return (
+      <p className="mt-2 text-[13px] text-pretty text-muted">
+        녹음에서 같은 표현을 찾지 못했어요. AI가 정리하며 바꾼 말일 수 있어요.
+      </p>
+    )
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="text-[13px] font-semibold text-muted">근거 듣기</span>
+      {concept.evidence.map((e) => (
+        <button
+          key={e.start}
+          type="button"
+          title={e.text}
+          onClick={() => onListen(e.start)}
+          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md bg-primary-soft px-2 text-[13px] font-semibold text-primary-deep tabular-nums"
+        >
+          <Play className="size-3.5" aria-hidden />
+          {clock(e.start)}
+        </button>
+      ))}
     </div>
   )
 }
@@ -214,32 +276,6 @@ function Processing({ lecture }: { lecture: Lecture }) {
       <ButtonLink to="/" className="mt-5">
         홈으로
       </ButtonLink>
-    </Card>
-  )
-}
-
-// 올린 녹음 원본 다시 듣기. 파일은 AI 서버가 스트리밍한다(GET /api/lectures/:id/audio-file).
-function OriginalAudio({ lectureId }: { lectureId: string }) {
-  const [failed, setFailed] = useState(false)
-  return (
-    <Card className="space-y-3 p-4">
-      <p className="flex items-center gap-1.5 text-[17px] font-bold">
-        <AudioLines className="size-5 text-primary" aria-hidden />
-        녹음 다시 듣기
-      </p>
-      {failed ? (
-        <p className="text-[14px] text-muted">녹음 파일을 불러오지 못했어요. AI 서버가 켜져 있는지 확인해 주세요.</p>
-      ) : (
-        <audio
-          controls
-          preload="metadata"
-          src={`/api/lectures/${lectureId}/audio-file`}
-          onError={() => setFailed(true)}
-          className="w-full"
-        >
-          이 브라우저는 오디오 재생을 지원하지 않아요.
-        </audio>
-      )}
     </Card>
   )
 }

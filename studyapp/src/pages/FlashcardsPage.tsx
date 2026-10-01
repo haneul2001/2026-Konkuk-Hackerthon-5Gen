@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { CardSession, Concept, Folder } from '../../shared/types'
-import { cardFromConcept } from '../../shared/cards'
+import type { Concept, FlashCard, Folder } from '../../shared/types'
+import { cardFromConcept, cardFromStudyCard } from '../../shared/cards'
 import { api } from '../api/client'
 import { LIBRARY_NAME } from '../lib/names'
 import { Flashcards, type CardResult } from '../components/Flashcards'
 import { ButtonLink, Card, ListSkeleton, PageTitle } from '../components/ui'
 
 // 플래시카드 보기. 무엇을 넘길지는 주소로 정한다.
-//  /flashcards?lecture=ID   녹음(강의) 하나의 AI 플래시카드. 다시 볼 때가 된 카드가 먼저 나온다
+//  /flashcards?lecture=ID   녹음(강의) 하나의 AI 큐카드. 다시 볼 카드·몰라요 카드가 먼저 나온다
 //  /flashcards?folder=ID    내 개념 폴더의 개념 카드. 볼 때마다 순서를 섞는다
 //  /flashcards?course=과목  학습 탭의 과목 필터 개념 카드 (없으면 전체 개념)
 // 첫 세트를 끝까지 넘기면 카드 수만큼 XP.
@@ -27,31 +27,42 @@ function useQuit(fallback: string) {
 
 function LectureCards({ lectureId }: { lectureId: string }) {
   const quit = useQuit(`/lectures/${lectureId}?tab=quiz`)
-  const [session, setSession] = useState<CardSession | null | undefined>(undefined)
+  // undefined: 불러오는 중
+  const [deck, setDeck] = useState<{ title: string; cards: FlashCard[] } | undefined>(undefined)
 
   useEffect(() => {
-    api.startCardSession(lectureId).then(setSession)
+    let alive = true
+    Promise.all([api.lectureCards(lectureId), api.concepts(), api.lecture(lectureId)]).then(
+      ([study, concepts, lecture]) => {
+        if (!alive) return
+        // 큐카드가 없으면(서버가 없거나 아직 못 만듦) 그 녹음의 개념 카드로 대신한다
+        const cards = study.length
+          ? study.map(cardFromStudyCard)
+          : concepts.filter((c) => c.lectureId === lectureId).map(cardFromConcept)
+        setDeck({ title: lecture?.title ?? '플래시카드', cards })
+      },
+    )
+    return () => {
+      alive = false
+    }
   }, [lectureId])
 
-  const report = useCallback(
-    async (results: CardResult[]) => {
-      if (!session) return 0
-      const r = await api.submitCardSession(session.id, results)
-      return 'error' in r ? 0 : (r.xpGained ?? 0)
-    },
-    [session],
-  )
+  // 첫 세트를 끝까지 넘기면: 큐카드 알아요/몰라요를 라이트너 상자에 저장하고, 카드 수만큼 XP
+  const report = useCallback(async (results: CardResult[]) => {
+    const study = results.filter((r) => !r.cardId.startsWith('cc_'))
+    if (study.length) void api.reviewCards(study)
+    return (await api.finishCardSet(results.length)).xpGained
+  }, [])
 
-  if (session === undefined) return <Loading />
-  if (session === null || session.cards.length === 0) {
+  if (deck === undefined) return <Loading />
+  if (deck.cards.length === 0) {
     return <Empty title="플래시카드" message="이 녹음의 플래시카드가 아직 없어요." to={`/lectures/${lectureId}?tab=quiz`} />
   }
 
-  // 서버가 없을 때 대신 쓰는 개념 카드는 kind: 'concept'를 그대로 둔다
   return (
     <Flashcards
-      title={session.title}
-      cards={session.cards.map((c) => ({ kind: 'ai', ...c }))}
+      title={deck.title}
+      cards={deck.cards}
       quizTo={`/quiz?lecture=${lectureId}`}
       onFirstPass={report}
       onQuit={quit}

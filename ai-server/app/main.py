@@ -24,6 +24,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
 from app import cards, config, resources, stt, vocab
+from app.evidence import find_evidence, mentioned_in
+from app.naming import normalize_names
 from app.audio import PRESETS, preprocess, probe_duration
 from app.db import Card, Concept, ConceptResource, Course, Lecture, Question, SessionLocal, init_db
 from app.quiz import service as quiz_service
@@ -53,11 +55,16 @@ async def lifespan(_: FastAPI):
 
 
 def _backfill_concepts(db: Session) -> None:
-    """개념 테이블이 생기기 전에 요약된 강의는 저장된 요약에서 개념 카드를 만든다."""
+    """개념 테이블이 생기기 전에 요약된 강의는 저장된 요약에서 개념 카드를 만들고,
+    근거 자막이 아직 없는 개념은 찾아 붙인다."""
     has_concepts = select(Concept.lecture_id).distinct()
     for lec in db.scalars(select(Lecture).where(Lecture.status == "done", Lecture.id.not_in(has_concepts))).all():
         for i, c in enumerate((lec.summary or {}).get("concepts", [])):
             db.add(Concept(lecture_id=lec.id, position=i, term=c["name"], summary=c["explanation"]))
+    db.flush()
+    for concept in db.scalars(select(Concept).where(Concept.evidence.is_(None))).all():
+        lec = db.get(Lecture, concept.lecture_id)
+        concept.evidence = find_evidence(concept.term, (lec.segments if lec else None) or [])
 
 
 app = FastAPI(title="학습도우미 AI 서버", lifespan=lifespan)
@@ -121,8 +128,25 @@ def _save_summary(lecture_id: str, result) -> None:
     with SessionLocal.begin() as db:
         lec = db.get(Lecture, lecture_id)
         _delete_concepts(db, lecture_id)
-        for i, c in enumerate(result.summary["concepts"]):
-            db.add(Concept(lecture_id=lecture_id, position=i, term=c["name"], summary=c["explanation"]))
+        segments = lec.segments or []
+        previews = result.summary.get("preview", [])
+        kept = []
+        for c in result.summary["concepts"]:
+            evidence = find_evidence(c["name"], segments)
+            # 예고만 한 내용을 개념으로도 만든 경우: 녹음에 근거가 없고 이름이 예고에 나오면 개념에서 뺀다
+            if not evidence and mentioned_in(c["name"], previews):
+                continue
+            kept.append(c)
+            db.add(
+                Concept(
+                    lecture_id=lecture_id,
+                    position=len(kept) - 1,
+                    term=c["name"],
+                    summary=c["explanation"],
+                    evidence=evidence,
+                )
+            )
+        result.summary["concepts"] = kept
         if lec.title_auto and result.summary.get("title"):
             week = lec.title.split(" — ")[0]
             lec.title = f"{week} — {result.summary['title']}"
@@ -150,6 +174,28 @@ def _attach_resources(lecture_id: str, provider: str) -> None:
                     db.add(ConceptResource(concept_id=cid, position=i, **r))
 
 
+def _normalize_concept_names(lecture_id: str, provider: str) -> None:
+    """개념 이름을 과목 용어집의 표준 용어로 맞춘다. 근거는 바꾸기 전 이름(강의 표현)까지 함께 찾는다."""
+    with SessionLocal() as db:
+        lec = db.get(Lecture, lecture_id)
+        course = db.get(Course, lec.course_id) if lec.course_id else None
+        vocabulary = _course_vocab(course)[0] if course else []
+        concepts = db.scalars(select(Concept).where(Concept.lecture_id == lecture_id)).all()
+        items = [{"id": c.id, "term": c.term, "summary": c.summary} for c in concepts]
+    renamed = normalize_names(items, vocabulary, provider)
+    if not renamed:
+        return
+    with SessionLocal.begin() as db:
+        segments = db.get(Lecture, lecture_id).segments or []
+        for cid, new in renamed.items():
+            c = db.get(Concept, cid)
+            old = c.term
+            found = {e["start"]: e for e in find_evidence(new, segments) + find_evidence(old, segments)}
+            c.evidence = sorted(found.values(), key=lambda e: e["start"])[:3]
+            c.summary = f"{c.summary} (강의에서는 '{old}'(이)라고 했어요.)"
+            c.term = new
+
+
 def _make_cards(lecture_id: str, provider: str) -> None:
     with SessionLocal.begin() as db:
         cards.generate_cards(db, lecture_id, provider)
@@ -162,7 +208,8 @@ def _summarize_step(lecture_id: str, transcript: str, terms: str | None, provide
         stt.unload_model()
     _save_summary(lecture_id, summarize(transcript, terms, provider))
     # 큐카드와 자료 링크는 부가 단계라 실패해도 강의는 ready로 둔다 (각각 다시 만드는 API가 있다)
-    for name, step in (("cards", _make_cards), ("resources", _attach_resources)):
+    # 이름 맞추기 → 큐카드·자료 순서 (큐카드와 자료 링크가 고친 이름을 쓰게)
+    for name, step in (("naming", _normalize_concept_names), ("cards", _make_cards), ("resources", _attach_resources)):
         try:
             step(lecture_id, provider)
         except Exception as e:
@@ -233,6 +280,7 @@ def _lecture_out(db: Session, lec: Lecture) -> dict:
         "error": lec.error,
         "overview": summary.get("overview"),
         "announcements": summary.get("announcements", []),
+        "preview": summary.get("preview", []),  # 다음 시간 예고 (개념으로 만들지 않은 것)
     }
 
 
@@ -257,6 +305,8 @@ def _concept_out(c: Concept, lec: Lecture, course_name: str, links: list[dict]) 
         "lectureTitle": lec.title,
         "course": course_name,
         "mastery": c.mastery,
+        # 근거 자막 [{start, end, text}]: 눌러서 녹음의 그 부분을 듣는다. 빈 배열이면 녹음에서 같은 표현을 못 찾음
+        "evidence": c.evidence or [],
         "resources": links,  # 공부 자료 링크 (studyapp 타입에 없는 추가 필드)
     }
 
@@ -363,7 +413,22 @@ def get_audio_file(lecture_id: str):
         path = config.DATA_DIR / lec.audio_path if lec.audio_path else None
     if not path or not path.exists():
         raise HTTPException(404, "녹음 원본이 없어요")
-    return FileResponse(path, media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+    # Windows는 .aac를 audio/vnd.dlna.adts 처럼 브라우저가 모르는 형식으로 알려줘서 직접 정한다
+    media_type = _AUDIO_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
+
+
+_AUDIO_TYPES = {
+    ".aac": "audio/aac",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".flac": "audio/flac",
+}
 
 
 @app.post("/api/lectures/{lecture_id}/summary", status_code=202)
@@ -401,6 +466,31 @@ class CardSessionIn(BaseModel):
 
 class CardSubmitIn(BaseModel):
     results: list[dict] = Field(description="[{cardId, known: true | false}]")
+
+
+class CardReviewIn(BaseModel):
+    results: list[dict] = Field(description="[{cardId, known: true | false}]")
+
+
+@app.get("/api/cards")
+def list_study_cards(lecture: str | None = None, concepts: str | None = None):
+    """플래시카드 화면용 카드. ?lecture=ID 또는 ?concepts=id1,id2 (폴더·과목), 없으면 전체.
+    다시 볼 때가 된 카드와 몰라요 카드가 앞에 온다."""
+    with SessionLocal() as db:
+        if lecture:
+            ids = list(db.scalars(select(Concept.id).where(Concept.lecture_id == lecture)))
+        elif concepts is not None:
+            ids = [c for c in concepts.split(",") if c]
+        else:
+            ids = None
+        return cards.cards_for(db, ids)
+
+
+@app.post("/api/cards/review")
+def review_study_cards(body: CardReviewIn):
+    """플래시카드 알아요/몰라요 결과로 라이트너 상자를 갱신한다."""
+    with SessionLocal.begin() as db:
+        return cards.review(db, body.results)
 
 
 @app.get("/api/lectures/{lecture_id}/cards")

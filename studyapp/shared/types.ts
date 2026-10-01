@@ -15,6 +15,7 @@ export type Lecture = {
   error?: string | null // status가 failed일 때 이유
   overview?: string | null // 강의 개요 2~3문장
   announcements?: string[] // 시험·과제 공지 (전사본에 근거가 있는 것만)
+  preview?: string[] // 다음 시간 예고 (이번 강의에서 설명하지 않아 개념으로 만들지 않은 것)
 }
 
 export type ReviewItem = {
@@ -151,6 +152,8 @@ export type Concept = {
   course: string
   mastery: 'new' | 'learning' | 'mastered' // 새 개념 | 익히는 중 | 외움 (퀴즈 결과로 갱신)
   resources?: StudyResource[] // AI 서버가 붙여 주는 공부 자료 링크
+  // 근거 자막 (AI 서버). 눌러서 녹음의 그 부분을 듣는다. 빈 배열이면 녹음에서 같은 표현을 못 찾음
+  evidence?: TranscriptSegment[]
 }
 
 // 개념 공부 자료 링크(위키백과·믿을 만한 블로그). 틀린 문제에서 "이 개념 다시 공부하기"로 보여준다.
@@ -163,8 +166,7 @@ export type StudyResource = {
 }
 
 // ---- 플래시카드 ----
-// AI 서버가 강의마다 개념당 1~3장 만든다. 앞면 질문 → 뒷면 답·설명·AI 예시.
-// 반복은 라이트너 상자(box 1~5). 개념 폴더·과목처럼 여러 강의를 묶을 땐 개념으로 카드를 만든다.
+// 화면에 넘기는 카드 한 장. 녹음은 AI 큐카드(StudyCard)를, 개념 폴더·과목은 개념을 이 모양으로 바꿔 쓴다.
 
 export type FlashCard = {
   id: string
@@ -182,22 +184,26 @@ export type FlashCard = {
   from?: string
 }
 
-export type CardSession = {
+// 플래시카드(큐카드). AI 서버가 요약의 개념마다 1~3장 만든다. 앞면 질문 → 뒷면 정답·설명
+export type StudyCard = {
   id: string
   lectureId: string
-  title: string
-  cards: FlashCard[]
-  dueCount: number
+  conceptId: string
+  icon: string
+  front: string // 질문
+  answer: string
+  explanation: string // 강의 내용 기반 설명
+  example: string | null // AI가 덧붙인 비유·예시 (강의 내용과 구분해서 보여준다)
+  box: number | null // 라이트너 상자 1~5, 아직 안 본 카드는 null
+  term: string
+  lectureTitle: string
 }
 
-export type CardSubmitResult = {
-  sessionId: string
-  lectureId: string
-  finished: boolean // 세트를 끝까지 봤는지
-  cardCount: number
-  known: number
-  unknown: number
-  xpGained?: number // Express가 붙인다
+// 녹음 다시 듣기 자막 한 줄. start·end는 녹음 시작부터의 초
+export type TranscriptSegment = {
+  start: number
+  end: number
+  text: string
 }
 
 export type QuizType = 'multiple' | 'ox' | 'essay'
@@ -228,6 +234,9 @@ type QuestionBase = {
   explanation: string
   retry?: boolean // 전에 틀려서 다시 낸 문제
   resources?: StudyResource[] // 틀렸을 때 보여줄 그 개념의 공부 자료
+  // AI 서버가 낸 문제: 묻는 측면(정의, 계산 변형 …)과 난이도. advanced면 심화 문제
+  aspect?: string | null
+  level?: 'basic' | 'advanced'
 }
 
 export type MultipleQuestion = QuestionBase & {
@@ -261,6 +270,7 @@ export type Quiz = {
   title: string
   source: QuizSource
   questions: QuizQuestion[]
+  notice?: string | null // 요청보다 적게 냈을 때 이유 (개념이 적어서 등). 첫 문제 위에 띄운다
   meta?: Record<string, unknown> // AI 서버의 재출제·생성 통계
 }
 

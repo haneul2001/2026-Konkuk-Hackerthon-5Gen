@@ -182,6 +182,27 @@ def start_session(db: Session, lecture_id: str, count: int | None = None, user_i
     }
 
 
+def _apply(db: Session, card_id: str, known: bool, user_id: str | None, now: datetime) -> None:
+    """라이트너 상자 갱신: 알아요 → 한 칸 위, 몰라요 → 1번 상자. 다시 볼 때를 상자 간격으로 정한다"""
+    p = db.scalars(
+        select(CardProgress).where(
+            CardProgress.card_id == card_id,
+            CardProgress.user_id.is_(user_id) if user_id is None else CardProgress.user_id == user_id,
+        )
+    ).first()
+    if not p:
+        p = CardProgress(card_id=card_id, user_id=user_id, box=1, known_count=0, unknown_count=0)
+        db.add(p)
+    if known:
+        p.known_count += 1
+        p.box = min(p.box + 1, MAX_BOX)
+    else:
+        p.unknown_count += 1
+        p.box = 1
+    p.last_reviewed_at = now
+    p.due_at = now + timedelta(days=BOX_INTERVAL_DAYS[p.box])
+
+
 def submit_session(db: Session, session_id: str, results: list[dict]) -> dict | None:
     """알아요/몰라요를 반영한다. 세트의 카드를 다 봤으면 finished=true (Express가 XP를 준다)."""
     session = db.get(CardSession, session_id)
@@ -194,24 +215,8 @@ def submit_session(db: Session, session_id: str, results: list[dict]) -> dict | 
         if card_id not in session.card_ids or card_id in seen or not isinstance(r.get("known"), bool):
             continue
         seen.add(card_id)
-        p = db.scalars(
-            select(CardProgress).where(
-                CardProgress.card_id == card_id,
-                CardProgress.user_id.is_(session.user_id) if session.user_id is None else CardProgress.user_id == session.user_id,
-            )
-        ).first()
-        if not p:
-            p = CardProgress(card_id=card_id, user_id=session.user_id, box=1, known_count=0, unknown_count=0)
-            db.add(p)
-        if r["known"]:
-            known += 1
-            p.known_count += 1
-            p.box = min(p.box + 1, MAX_BOX)
-        else:
-            p.unknown_count += 1
-            p.box = 1
-        p.last_reviewed_at = now
-        p.due_at = now + timedelta(days=BOX_INTERVAL_DAYS[p.box])
+        _apply(db, card_id, r["known"], session.user_id, now)
+        known += r["known"]
     finished = seen >= set(session.card_ids)
     if finished and not session.finished_at:
         session.finished_at = now
@@ -224,3 +229,42 @@ def submit_session(db: Session, session_id: str, results: list[dict]) -> dict | 
         "known": known,
         "unknown": len(seen) - known,
     }
+
+
+# ---------- 플래시카드 화면용 (강의·폴더·과목 어디서든) ----------
+
+def cards_for(db: Session, concept_ids: list[str] | None, user_id: str | None = None) -> list[dict]:
+    """개념 묶음의 카드. 다시 볼 때가 된 카드·몰라요 카드(낮은 상자)가 앞에 온다. concept_ids가 None이면 전체"""
+    query = select(Card, Concept, Lecture).join(Concept, Card.concept_id == Concept.id).join(Lecture, Card.lecture_id == Lecture.id)
+    if concept_ids is not None:
+        if not concept_ids:
+            return []
+        query = query.where(Card.concept_id.in_(concept_ids))
+    rows = db.execute(query).all()
+    progress = _progress_map(db, [card.id for card, _, _ in rows], user_id)
+    now = _now()
+
+    def priority(row):
+        card = row[0]
+        p = progress.get(card.id)
+        due = p is None or p.due_at is None or _aware(p.due_at) <= now
+        return (0 if due else 1, p.box if p else 0, row[2].created_at, card.position)
+
+    return [
+        {**card_out(card, progress.get(card.id)), "term": concept.term, "lectureTitle": lecture.title}
+        for card, concept, lecture in sorted(rows, key=priority)
+    ]
+
+
+def review(db: Session, results: list[dict], user_id: str | None = None) -> dict:
+    """플래시카드 결과 [{cardId, known}]를 반영한다"""
+    now = _now()
+    known = unknown = 0
+    for r in results:
+        if not isinstance(r.get("known"), bool) or not db.get(Card, r.get("cardId")):
+            continue
+        _apply(db, r["cardId"], r["known"], user_id, now)
+        known += r["known"]
+        unknown += not r["known"]
+    db.flush()
+    return {"reviewed": known + unknown, "known": known, "unknown": unknown}

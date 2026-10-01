@@ -101,6 +101,8 @@ class Concept(Base):
     summary: Mapped[str] = mapped_column(Text)
     # new → learning → mastered (퀴즈 결과로 갱신)
     mastery: Mapped[str] = mapped_column(String(10), default="new")
+    # 근거 자막 [{start, end, text}] (app/evidence.py). None이면 아직 안 찾음, []이면 녹음에서 못 찾음
+    evidence: Mapped[list | None] = mapped_column(JSON)
 
 
 class ConceptResource(Base):
@@ -130,6 +132,8 @@ class Question(Base):
     lecture_id: Mapped[str] = mapped_column(String(32), ForeignKey("lectures.id", ondelete="CASCADE"), index=True)
     concept_id: Mapped[str] = mapped_column(String(32), ForeignKey("concepts.id", ondelete="CASCADE"), index=True)
     type: Mapped[str] = mapped_column(String(10), index=True)  # multiple | ox | essay
+    # 개념의 어떤 측면을 묻는지 (정의, 원리·이유 …). 같은 개념에서 같은 측면만 반복해 묻지 않게 한다
+    aspect: Mapped[str | None] = mapped_column(String(20))
     prompt: Mapped[str] = mapped_column(Text)
     explanation: Mapped[str] = mapped_column(Text)
     # 유형별 정답 정보: multiple {choices, answerIndex} / ox {answer} / essay {modelAnswer, keywords}
@@ -217,10 +221,15 @@ _LECTURE_COLUMNS = {
 }
 
 
+_QUESTION_COLUMNS = {"aspect": "VARCHAR(20)"}
+_CONCEPT_COLUMNS = {"evidence": "JSON"}
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)
-    columns = {c["name"] for c in inspect(engine).get_columns("lectures")}
     with engine.begin() as conn:
-        for name, ddl in _LECTURE_COLUMNS.items():
-            if name not in columns:
-                conn.execute(text(f"ALTER TABLE lectures ADD COLUMN {name} {ddl}"))
+        for table, wanted in (("lectures", _LECTURE_COLUMNS), ("questions", _QUESTION_COLUMNS), ("concepts", _CONCEPT_COLUMNS)):
+            columns = {c["name"] for c in inspect(engine).get_columns(table)}
+            for name, ddl in wanted.items():
+                if name not in columns:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))

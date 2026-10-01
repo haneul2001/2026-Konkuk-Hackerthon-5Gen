@@ -8,6 +8,7 @@
 import math
 import random
 import re
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -65,8 +66,9 @@ def _weighted_sample(items: list, weights: list[float], k: int) -> list:
 
 
 def _allocate(need: int, concepts: list[Concept], weights: list[float]) -> dict[str, int]:
-    """새 문제 need개를 개념에 나눈다. 가중치대로 뽑되 한 개념에 몰리지 않게 상한을 둔다."""
-    cap = math.ceil(need / len(concepts)) + 1
+    """새 문제 need개를 개념에 나눈다. 가중치대로 뽑되 한 개념에 몰리지 않게 상한을 둔다.
+    한 개념에서는 측면(정의, 원리·이유 …) 수보다 많이 내지 않는다."""
+    cap = min(math.ceil(need / len(concepts)) + 1, len(prompt.ASPECTS) + len(prompt.ADVANCED_ASPECTS))
     counts = {c.id: 0 for c in concepts}
     for _ in range(need):
         open_ = [(c, w) for c, w in zip(concepts, weights) if counts[c.id] < cap]
@@ -151,17 +153,52 @@ def _body(qtype: str, item: dict) -> dict:
     }
 
 
+def _pick_aspects(db: Session, concept: Concept, n: int, advanced: bool = False) -> list[str]:
+    """그 개념에서 덜 물어본 측면부터 n개 (같으면 무작위).
+    기본 측면을 한 번씩 다 냈거나, 그 개념을 익혔거나(mastered), advanced면 심화 측면을 앞에 둔다."""
+    used: dict[str, int] = {}
+    for (aspect,) in db.execute(select(Question.aspect).where(Question.concept_id == concept.id)):
+        if aspect:
+            used[aspect] = used.get(aspect, 0) + 1
+    rank = lambda aspects: sorted(aspects, key=lambda a: (used.get(a, 0), random.random()))  # noqa: E731
+    basic, deep = rank(prompt.ASPECTS), rank(prompt.ADVANCED_ASPECTS)
+    # 녹음에서 근거를 못 찾은 개념(AI가 바꾸거나 지어냈을 수 있음)은 심화로 깊게 파고들지 않는다
+    if concept.evidence == []:
+        return [basic[i % len(basic)] for i in range(n)]
+    basic_done = min(used.get(a, 0) for a in prompt.ASPECTS) >= 1
+    order = deep + basic if advanced or basic_done or concept.mastery == "mastered" else basic + deep
+    return [order[i % len(order)] for i in range(n)]
+
+
+def level_of(aspect: str | None) -> str:
+    return "advanced" if aspect in prompt.ADVANCED_ASPECTS else "basic"
+
+
+def _review_choices(items: list[dict], provider: str) -> set[int]:
+    """객관식 보기 검수: 뜻이 같은 보기가 있거나 정답이 둘 이상으로 읽히는 문제의 번호"""
+    if not items:
+        return set()
+    result = call(provider, prompt.REVIEW_SYSTEM, prompt.build_review_message(items), prompt.REVIEW_SCHEMA)
+    return {
+        r["index"]
+        for r in result.data.get("items", [])
+        if isinstance(r.get("index"), int) and (r.get("same_meaning") or r.get("multiple_answers"))
+    }
+
+
 def generate_questions(
     db: Session,
     qtype: str,
     allocation: dict[str, int],
     concepts: dict[str, Concept],
     provider: str,
+    advanced: bool = False,
 ) -> tuple[list[Question], dict]:
-    """allocation대로 새 문제를 만들어 저장한다. (만든 문제, 통계)"""
+    """allocation대로 새 문제를 만들어 저장한다. advanced면 심화 측면부터 낸다. (만든 문제, 통계)"""
     lectures = {c.lecture_id for c in concepts.values() if c.id in allocation}
     transcripts = {lid: (db.get(Lecture, lid).transcript_text or "") for lid in lectures}
 
+    aspects = {cid: _pick_aspects(db, concepts[cid], n, advanced) for cid, n in allocation.items()}
     plan = [
         {
             "id": cid,
@@ -169,6 +206,7 @@ def generate_questions(
             "summary": concepts[cid].summary,
             "excerpt": _excerpt(transcripts[concepts[cid].lecture_id], concepts[cid].term),
             "count": n,
+            "aspects": aspects[cid],
         }
         for cid, n in allocation.items()
     ]
@@ -179,7 +217,10 @@ def generate_questions(
         .limit(AVOID_LIMIT)
     ).all()
 
-    result = call(provider, prompt.SYSTEM_PROMPT, prompt.build_user_message(qtype, plan, [q.prompt for q in avoid]), prompt.schema_for(qtype))
+    # 개념 연결의 상대는 녹음에 근거가 있는 개념만
+    others = [c.term for c in concepts.values() if c.evidence != []]
+    message = prompt.build_user_message(qtype, plan, [q.prompt for q in avoid], others)
+    result = call(provider, prompt.SYSTEM_PROMPT, message, prompt.schema_for(qtype))
 
     # 근거 확인: 전사본 또는 (발췌가 없을 때) 개념 설명에 있는 문장이어야 한다
     grounders = {
@@ -187,9 +228,10 @@ def generate_questions(
         for lid, text in transcripts.items()
     }
     by_term = {_norm(c.term): c.id for c in concepts.values() if c.id in allocation}
-    made, dropped = [], {"invalid": 0, "ungrounded": 0, "unknown_concept": 0, "over_quota": 0, "duplicate": 0}
+    dropped = {"invalid": 0, "ungrounded": 0, "unknown_concept": 0, "over_quota": 0, "duplicate": 0, "bad_choices": 0}
     # 이미 낸 문제와 이번에 만든 문제의 (질문, 정답) 특징
     seen = [(_grams(q.prompt), _grams(_answer_text(q.type, q.body))) for q in avoid]
+    accepted: list[tuple[str, dict]] = []  # (개념 id, 문제)
     for item in result.data.get("questions", []):
         cid = item.get("conceptId", "")
         if cid not in allocation:
@@ -199,7 +241,7 @@ def generate_questions(
             dropped["unknown_concept"] += 1
             continue
         # 개념별 배분은 권장이다. 모델이 한 개념에 더 냈어도 전체 개수 안이면 받는다
-        if len(made) >= sum(allocation.values()):
+        if len(accepted) >= sum(allocation.values()):
             dropped["over_quota"] += 1
             continue
         if not _valid(qtype, item):
@@ -209,14 +251,29 @@ def generate_questions(
         if _is_duplicate(sig, seen):
             dropped["duplicate"] += 1
             continue
-        concept = concepts[cid]
-        if not grounders[concept.lecture_id].is_grounded(item.get("evidence", "")):
+        if not grounders[concepts[cid].lecture_id].is_grounded(item.get("evidence", "")):
             dropped["ungrounded"] += 1
             continue
+        accepted.append((cid, item))
+        seen.append(sig)
+
+    latency = result.latency_sec
+    if qtype == "multiple" and accepted:
+        review_start = time.perf_counter()
+        bad = _review_choices([_body(qtype, item) | {"prompt": item["prompt"]} for _, item in accepted], provider)
+        latency += time.perf_counter() - review_start
+        dropped["bad_choices"] = len(bad)
+        accepted = [a for i, a in enumerate(accepted) if i not in bad]
+
+    made = []
+    for cid, item in accepted:
+        concept = concepts[cid]
+        aspect = (item.get("aspect") or "").strip()
         q = Question(
             lecture_id=concept.lecture_id,
             concept_id=cid,
             type=qtype,
+            aspect=aspect if aspect in prompt.ASPECTS or aspect in prompt.ADVANCED_ASPECTS else None,
             prompt=item["prompt"].strip(),
             explanation=item.get("explanation", "").strip(),
             body=_body(qtype, item),
@@ -225,16 +282,23 @@ def generate_questions(
         )
         db.add(q)
         made.append(q)
-        seen.append(sig)
     db.flush()
-    return made, {"latency_sec": round(result.latency_sec, 1), "dropped": dropped}
+    return made, {"latency_sec": round(latency, 1), "dropped": dropped}
 
 
 # ---------- 출제 ----------
 
 def to_frontend(q: Question, shuffle_choices: bool = True) -> dict:
     """studyapp/shared/types.ts 의 QuizQuestion 모양"""
-    data = {"id": q.id, "conceptId": q.concept_id, "type": q.type, "prompt": q.prompt, "explanation": q.explanation}
+    data = {
+        "id": q.id,
+        "conceptId": q.concept_id,
+        "type": q.type,
+        "prompt": q.prompt,
+        "explanation": q.explanation,
+        "aspect": q.aspect,
+        "level": level_of(q.aspect),  # basic | advanced (심화)
+    }
     if q.type == "multiple":
         choices, answer = q.body["choices"], q.body["answerIndex"]
         if shuffle_choices:
@@ -294,7 +358,10 @@ def build_quiz(
                 shortfall = need - len(generated)
                 if shortfall <= 0:
                     break
-                made, gen_stats = generate_questions(db, qtype, _allocate(shortfall, concepts, weights), by_id, provider or DEFAULT_PROVIDER)
+                # 첫 번째로 모자라면 기본 측면이 겹친 것이라, 두 번째는 심화 측면으로 채운다
+                made, gen_stats = generate_questions(
+                    db, qtype, _allocate(shortfall, concepts, weights), by_id, provider or DEFAULT_PROVIDER, advanced=attempt > 0
+                )
                 generated += made
                 stats[f"attempt{attempt + 1}"] = {"made": len(made), **gen_stats}
             stats["generated"] = len(generated)
@@ -319,8 +386,26 @@ def build_quiz(
         # retry: 전에 틀려서 다시 낸 문제 (화면에서 "다시 도전" 표시용)
         # resources: 틀렸을 때 보여줄 그 개념의 공부 자료 링크
         "questions": [{**to_frontend(q), "retry": q in reused, "resources": _resources(db, q)} for q in questions],
+        # 요청보다 적게 냈을 때 퀴즈 맨 위에 띄울 안내 (없으면 null)
+        "notice": _quiz_notice(count, questions, len(concepts)),
         "meta": stats,
     }
+
+
+def _quiz_notice(requested: int, questions: list[Question], concept_count: int) -> str | None:
+    """퀴즈 맨 위 안내: 심화 문제가 섞였는지, 요청보다 적게 냈는지"""
+    parts = []
+    deep = sum(1 for q in questions if level_of(q.aspect) == "advanced")
+    if deep:
+        parts.append(f"심화 문제 {deep}개가 포함됐어요.")
+    made = len(questions)
+    if made < requested:
+        # 한 개념에서 측면마다 한 문제씩이라, 개념이 적으면 낼 수 있는 문제도 적다
+        if concept_count * 2 < requested:
+            parts.append(f"이 강의에서 정리된 개념이 {concept_count}개뿐이라 {requested}문제 대신 {made}문제를 만들었어요.")
+        else:
+            parts.append(f"겹치거나 강의 근거가 부족한 문제를 빼서 {requested}문제 대신 {made}문제를 만들었어요.")
+    return " ".join(parts) or None
 
 
 def build_review_quiz(db: Session, lecture_id: str, reason: str, count: int, review_id: str) -> dict | None:
