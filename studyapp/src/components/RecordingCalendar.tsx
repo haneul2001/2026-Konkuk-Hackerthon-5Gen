@@ -174,7 +174,7 @@ export function RecordingCalendar({
             <button
               type="button"
               onClick={() => setAdding(selected)}
-              className="-mr-2 flex h-10 cursor-pointer items-center gap-1 rounded-lg px-2 text-[14px] font-bold text-primary active:bg-line/60"
+              className="-mr-2 flex h-10 cursor-pointer items-center gap-1 rounded-lg px-2 text-[14px] font-bold text-muted active:bg-line/60"
             >
               <Plus className="size-4" strokeWidth={2.5} aria-hidden />
               녹음 넣기
@@ -338,7 +338,7 @@ function ChoiceButton({
       onClick={onClick}
       className="press flex w-full cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-surface px-4 py-3.5 text-left shadow-[0_3px_0_var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-primary"
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-highlight-soft text-primary-deep">
         <Icon className="size-5" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">

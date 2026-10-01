@@ -207,7 +207,7 @@ function FlipCard({ card, flipped, onFlip }: { card: FlashCard; flipped: boolean
         className="absolute inset-0 flex flex-col overflow-hidden rounded-3xl border-2 border-line bg-surface px-6 pt-5 pb-4 shadow-[0_4px_0_var(--color-line)] backface-hidden"
       >
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-primary-soft px-3 py-1 text-[13px] font-bold text-primary">
+          <span className="rounded-full bg-highlight-soft px-3 py-1 text-[13px] font-bold text-primary-deep">
             {isConcept ? 'Q. 이 설명에 맞는 개념은?' : 'Q.'}
           </span>
           {card.icon && (

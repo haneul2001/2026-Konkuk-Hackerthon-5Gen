@@ -327,7 +327,7 @@ function Options({
                 <span className="block text-[15px] font-bold">{t.label}</span>
                 <span className="block text-[13px] text-muted">{t.note}</span>
               </span>
-              {selected && <Check className="size-5 text-primary" strokeWidth={3} aria-hidden />}
+              {selected && <Check className="size-5 text-muted" strokeWidth={3} aria-hidden />}
             </label>
           )
         })}
@@ -365,7 +365,7 @@ const COUNTS = [5, 10, 15, 20]
 function Generating() {
   return (
     <Card role="status" className="flex items-center gap-3 p-4">
-      <Loader className="size-6 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+      <Loader className="size-6 shrink-0 animate-spin text-muted motion-reduce:animate-none" aria-hidden />
       <div>
         <p className="text-[15px] font-bold">문제를 만드는 중이에요</p>
         <p className="mt-0.5 text-[13px] text-muted">강의 내용을 보고 새로 만들어서 15~45초쯤 걸려요.</p>
@@ -376,7 +376,7 @@ function Generating() {
 
 function FolderBadge() {
   return (
-    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary" aria-hidden>
+    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-highlight-soft text-primary-deep" aria-hidden>
       <FolderIcon className="size-5" />
     </span>
   )

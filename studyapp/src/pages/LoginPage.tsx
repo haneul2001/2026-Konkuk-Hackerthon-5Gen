@@ -66,7 +66,7 @@ export function LoginPage() {
         <form onSubmit={submit} className="my-auto w-full space-y-5">
           <div className="flex flex-col items-center text-center">
             <Mascot pose="welcome" className="w-32" />
-            <h1 className="mt-3 text-[28px] font-extrabold tracking-tight text-primary">
+            <h1 className="mt-3 text-[28px] font-extrabold tracking-tight text-muted">
               <span className="text-bright">{APP_NAME.slice(0, 1)}</span>
               {APP_NAME.slice(1)}
             </h1>

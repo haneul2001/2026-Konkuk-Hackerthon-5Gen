@@ -119,7 +119,7 @@ export function QuizResult({
 function Resources({ items }: { items: StudyResource[] }) {
   return (
     <div className="mt-3 rounded-xl bg-bg px-3.5 py-3">
-      <p className="flex items-center gap-1.5 text-[13px] font-bold text-primary">
+      <p className="flex items-center gap-1.5 text-[13px] font-bold text-muted">
         <BookOpen className="size-4" aria-hidden />이 개념 다시 공부하기
       </p>
       <ul className="mt-1.5 space-y-1">

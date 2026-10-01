@@ -269,7 +269,7 @@ function BoardList({ board, tag }: { board: BoardKind; tag: string }) {
           onClick={() => setParams({ write: '1', ...(board !== 'free' && { board }) })}
           className="press pointer-events-auto flex h-12 cursor-pointer items-center gap-2 rounded-full border-2 border-line-strong bg-surface px-6 text-[15px] font-bold shadow-[0_4px_0_var(--color-line-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          <Pencil className="size-5 text-primary" aria-hidden />
+          <Pencil className="size-5 text-muted" aria-hidden />
           글 쓰기
         </button>
       </div>
@@ -392,7 +392,7 @@ function PostDetail({ id }: { id: string }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <p className="text-[13px] font-semibold text-primary">{boardLabel[post.board]}</p>
+      <p className="text-[13px] font-semibold text-muted">{boardLabel[post.board]}</p>
 
       <div className="mt-3 flex items-center gap-2.5">
         <Avatar id={post.avatar ?? ''} className="size-10 border-2 border-line" />
@@ -678,7 +678,7 @@ function Contact({ value }: { value: string }) {
         href={value}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-1 flex items-center gap-1.5 text-[15px] font-semibold break-all text-primary underline underline-offset-2"
+        className="mt-1 flex items-center gap-1.5 text-[15px] font-semibold break-all text-muted underline underline-offset-2"
       >
         {value}
         <ExternalLink className="size-4 shrink-0" aria-hidden />
@@ -718,7 +718,7 @@ function CommentItem({
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className={cn('flex min-w-0 items-center gap-2 text-[14px] font-bold', c.isWriter && 'text-primary')}>
+        <p className={cn('flex min-w-0 items-center gap-2 text-[14px] font-bold', c.isWriter && 'text-muted')}>
           <Avatar id={c.avatar ?? ''} className="size-7 border border-line" />
           <span className="truncate">{c.author}</span>
         </p>
@@ -735,7 +735,7 @@ function CommentItem({
                   onClick={a.onClick}
                   className={cn(
                     'flex h-8 w-9 cursor-pointer items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-primary',
-                    a.active && (a.key === 'like' ? 'text-danger' : 'text-primary'),
+                    a.active && (a.key === 'like' ? 'text-danger' : 'text-accent-ink'),
                   )}
                 >
                   <a.icon className="size-4" aria-hidden fill={a.key === 'like' && a.active ? 'currentColor' : 'none'} />
@@ -930,7 +930,7 @@ function CommentBox({
   return (
     <form onSubmit={submit} className="-mx-5 bg-bg px-5 pt-3">
       {replyTo && (
-        <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-primary">
+        <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-muted">
           <CornerDownRight className="size-4" aria-hidden />
           <span className="min-w-0 flex-1 truncate">{replyTo.author}님 댓글에 대댓글 쓰는 중</span>
           <button
@@ -958,7 +958,7 @@ function CommentBox({
           type="submit"
           aria-label="댓글 올리기"
           disabled={!text.trim() || busy}
-          className="flex size-11 shrink-0 cursor-pointer items-center justify-center text-primary disabled:cursor-not-allowed disabled:text-muted/50"
+          className="flex size-11 shrink-0 cursor-pointer items-center justify-center text-muted disabled:cursor-not-allowed disabled:text-muted/50"
         >
           <SendHorizontal className="size-5" aria-hidden />
         </button>
@@ -982,7 +982,7 @@ function AnonymousCheck({ checked, onChange, id }: { checked: boolean; onChange:
         onChange={(e) => onChange(e.target.checked)}
         className="size-4 cursor-pointer accent-primary"
       />
-      <span className={checked ? 'text-primary' : 'text-muted'}>익명</span>
+      <span className={checked ? 'font-bold text-ink' : 'text-muted'}>익명</span>
     </label>
   )
 }

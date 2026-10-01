@@ -37,7 +37,7 @@ export function Section({
           <Link
             to={action.to}
             className={cn(
-              '-mr-2 inline-flex h-11 items-center gap-0.5 rounded-lg px-2 text-sm font-medium text-primary',
+              '-mr-2 inline-flex h-11 items-center gap-0.5 rounded-lg px-2 text-sm font-medium text-muted',
               focusRing,
             )}
           >

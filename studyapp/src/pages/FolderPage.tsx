@@ -76,7 +76,7 @@ export function FolderPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary" aria-hidden>
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-highlight-soft text-primary-deep" aria-hidden>
           <FolderIcon className="size-6" />
         </span>
         <div className="min-w-0 flex-1">

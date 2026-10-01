@@ -257,7 +257,7 @@ function Processing({ lecture }: { lecture: Lecture }) {
   const pct = lecture.stage === 'transcribing' && lecture.progress != null ? Math.round(lecture.progress * 100) : null
   return (
     <Card role="status" className="flex flex-col items-center px-5 py-10 text-center">
-      <Loader className="size-7 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+      <Loader className="size-7 animate-spin text-muted motion-reduce:animate-none" aria-hidden />
       <p className="mt-3 text-[16px] font-bold">{label}</p>
       {pct !== null && (
         <div className="mt-3 h-2.5 w-full max-w-60 overflow-hidden rounded-full bg-line">

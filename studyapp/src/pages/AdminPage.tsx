@@ -206,7 +206,7 @@ function Reports() {
         <button
           type="button"
           onClick={load}
-          className="-mr-2 inline-flex h-11 cursor-pointer items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-primary"
+          className="-mr-2 inline-flex h-11 cursor-pointer items-center gap-1 rounded-lg px-2 text-sm font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary"
         >
           <RefreshCw className="size-4" aria-hidden />
           새로고침
@@ -235,7 +235,7 @@ function Reports() {
                 </p>
                 <Link
                   to={`/board?post=${r.postId}`}
-                  className="block truncate text-[13px] font-medium text-primary underline-offset-2 hover:underline"
+                  className="block truncate text-[13px] font-medium text-muted underline-offset-2 hover:underline"
                 >
                   글: {r.postTitle}
                 </Link>

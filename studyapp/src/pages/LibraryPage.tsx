@@ -256,7 +256,7 @@ export function LibraryPage() {
               <button
                 type="button"
                 onClick={() => setManagingTags(true)}
-                className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full border-2 border-dashed border-line-strong px-4 text-sm font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full border-2 border-dashed border-line-strong px-4 text-sm font-semibold text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 <Plus className="size-4" strokeWidth={2.5} aria-hidden />
                 태그
@@ -271,9 +271,10 @@ export function LibraryPage() {
               variant="primary"
               className="w-full"
             >
-              <Layers className="size-5" aria-hidden />
-              {course || '전체'} 개념 플래시카드로 외우기
-              <span className="tabular-nums opacity-80">{cardCount}장</span>
+              <Layers className="size-5 shrink-0" aria-hidden />
+              {/* 과목 이름이 길어도 한 줄: 이름은 말줄임, 장 수는 꺾이지 않게 */}
+              <span className="min-w-0 truncate">{course || '전체'} 플래시카드로 외우기</span>
+              <span className="shrink-0 whitespace-nowrap tabular-nums opacity-80">{cardCount}장</span>
             </ButtonLink>
           )}
 
@@ -306,7 +307,7 @@ export function LibraryPage() {
                                   {l.durationMin}분 녹음
                                   {l.status === 'ready' && ` · 개념 ${countFor(concepts, l.id)}개`}
                                   {myTags.length > 0 && (
-                                    <span className="text-primary"> · {myTags.map((t) => `#${t}`).join(' ')}</span>
+                                    <span className="text-muted"> · {myTags.map((t) => `#${t}`).join(' ')}</span>
                                   )}
                                 </span>
                               }
@@ -324,7 +325,7 @@ export function LibraryPage() {
                               type="button"
                               aria-label={`${l.title} 폴더·태그 정리`}
                               onClick={() => setFiling(l)}
-                              className="mr-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
+                              className="mr-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
                             >
                               <FolderPlus className="size-5" aria-hidden />
                             </button>
@@ -699,7 +700,7 @@ const UNDO_MS = 10_000
 function FolderCardBody({ name, count }: { name: string; count: string }) {
   return (
     <>
-      <FolderIcon className="size-5 text-primary" fill="var(--color-primary-soft)" aria-hidden />
+      <FolderIcon className="size-5 text-muted" fill="var(--color-primary-soft)" aria-hidden />
       <span>
         <span className="line-clamp-2 text-[15px] leading-snug font-bold">{name}</span>
         <span className="mt-0.5 block text-xs text-muted tabular-nums">{count}</span>
@@ -807,7 +808,7 @@ function FileLectureSheet({
           <button
             type="button"
             onClick={onCreate}
-            className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 text-[14px] font-bold text-primary active:bg-bg"
+            className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 text-[14px] font-bold text-muted active:bg-bg"
           >
             <FolderPlus className="size-4" aria-hidden />새 폴더
           </button>
@@ -834,7 +835,7 @@ function FileLectureSheet({
                   }}
                   className="size-4 cursor-pointer accent-primary"
                 />
-                <FolderIcon className="size-5 shrink-0 text-primary" fill="var(--color-primary-soft)" aria-hidden />
+                <FolderIcon className="size-5 shrink-0 text-muted" fill="var(--color-primary-soft)" aria-hidden />
                 <span className="min-w-0">
                   <span className="block truncate text-[15px] font-bold">{f.name}</span>
                   <span className="block text-[12px] text-muted tabular-nums">녹음 {f.lectureIds.length}개</span>
@@ -878,7 +879,7 @@ function FileLectureSheet({
           maxLength={16}
           placeholder="+ 새 태그"
           aria-label="새 태그"
-          className="h-9 w-28 rounded-full border-2 border-dashed border-line-strong bg-surface px-3.5 text-[14px] placeholder:text-primary focus:border-primary focus:outline-none"
+          className="h-9 w-28 rounded-full border-2 border-dashed border-line-strong bg-surface px-3.5 text-[14px] placeholder:text-muted focus:border-primary focus:outline-none"
         />
       </div>
 

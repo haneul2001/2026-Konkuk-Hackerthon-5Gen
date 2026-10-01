@@ -10,7 +10,7 @@ const xpWays = [
   { icon: ListChecks, label: '객관식·O/X 정답', when: '맞힌 문제마다' },
   { icon: Layers, label: '플래시카드 학습', when: '한 세트 끝까지 · 장당 1 XP' },
   { icon: Headphones, label: 'TTS 듣기', when: '5분마다' },
-  { icon: Flame, label: '연속 학습일', when: '스트릭 보너스' },
+  { icon: Flame, label: '연속 학습일', when: '하루도 안 빠지고 이어 가면' },
   { icon: RotateCcw, label: '복습 완료', when: '알림 받은 날 끝내면' },
 ]
 
@@ -98,7 +98,7 @@ export function RankingPage() {
           <ul className="divide-y-2 divide-line">
             {xpWays.map(({ icon: Icon, label, when }) => (
               <li key={label} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-highlight-soft text-primary-deep">
                   <Icon className="size-[18px]" aria-hidden />
                 </span>
                 <span className="flex-1 text-[15px] font-semibold">{label}</span>

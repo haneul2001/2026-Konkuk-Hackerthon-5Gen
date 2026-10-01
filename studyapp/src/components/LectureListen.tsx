@@ -391,7 +391,7 @@ export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; sta
                     aria-label={nowPlaying ? '멈추기' : `${clock(s.start)}부터 듣기`}
                     className={cn(
                       'flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40',
-                      nowPlaying ? 'bg-highlight text-primary-deep' : 'text-primary active:bg-line/60',
+                      nowPlaying ? 'bg-highlight text-primary-deep' : 'text-muted active:bg-line/60',
                     )}
                   >
                     {nowPlaying ? (

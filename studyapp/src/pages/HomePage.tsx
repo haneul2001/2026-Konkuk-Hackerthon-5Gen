@@ -79,7 +79,7 @@ export function HomePage() {
           value={me ? `${currentStreak(me)}일` : '—'}
         />
         <Stat
-          icon={<Zap className="size-5 text-primary" fill="currentColor" aria-hidden />}
+          icon={<Zap className="size-5 text-muted" fill="currentColor" aria-hidden />}
           label="이번 주 XP"
           value={me ? me.xpThisWeek.toLocaleString() : '—'}
         />

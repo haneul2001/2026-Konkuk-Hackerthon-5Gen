@@ -307,7 +307,7 @@ function OxButton({
       <Icon
         className={cn(
           'size-16',
-          state === 'right' ? 'text-success' : state === 'wrong' ? 'text-danger' : value ? 'text-primary' : 'text-accent',
+          state === 'right' ? 'text-success' : state === 'wrong' ? 'text-danger' : value ? 'text-ink' : 'text-accent',
         )}
         strokeWidth={3}
         aria-hidden
