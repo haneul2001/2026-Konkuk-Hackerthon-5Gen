@@ -10,31 +10,33 @@
     "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
 
   --color-bg: #f5ead6; /* 쿠 베이지 */
-  --color-surface: #ffffff;
-  --color-ink: #10301b;
+  --color-surface: #fffcf6; /* 카드: 베이지와 어울리는 따뜻한 흰색 */
+  --color-ink: #2b2418; /* 짙은 갈색 글자 */
   --color-muted: #6f573c; /* 쿠 갈색, 베이지 위 대비 5.9:1 */
   --color-line: #eadcc0;
   --color-line-strong: #d6c29c;
 
   --color-primary: #005426; /* 쿠 진녹색, 흰 글자 대비 10:1 */
   --color-primary-deep: #00361a; /* 블록 버튼 바닥 그림자 */
-  --color-primary-soft: #dcf0e0;
-  --color-bright: #21ba31; /* KU Light Green, 채움·아이콘 전용 */
+  --color-primary-soft: #e3e9cf; /* 올리브 크림 */
+  --color-bright: #4f9a3c; /* 진행 막대 등 채움 전용 */
   --color-highlight: #f9c66a; /* 쿠 노랑. 강조 버튼·진녹색 위 강조 (글자는 primary-deep) */
   --color-highlight-deep: #c9973a; /* 노란 버튼 바닥 그림자 */
+  --color-highlight-soft: #fbe7bd;
 
-  --color-accent: #ea580c; /* 스트릭·순위. 아이콘·채움 전용 */
-  --color-accent-ink: #c2410c; /* 글자용 */
-  --color-accent-soft: #ffedd5;
+  --color-accent: #d07a2c; /* 스트릭 불꽃·진행 중. 아이콘·채움 전용 (구운 주황) */
+  --color-accent-ink: #8f4a12; /* 글자용, 연한 바탕 위 대비 5:1 이상 */
+  --color-accent-soft: #f6dcbc;
 
-  --color-success: #15803d;
-  --color-success-soft: #dcfce7;
-  --color-danger: #b91c1c;
-  --color-danger-soft: #fee2e2;
-  --color-danger-deep: #7f1d1d;
+  --color-success: #2f6b2c;
+  --color-success-soft: #dde8cc;
+  --color-danger: #a8321c;
+  --color-danger-soft: #f5d6c8;
+  --color-danger-deep: #6e1f10;
+  --color-saturday: #2f5a85; /* 캘린더 토요일. 베이지 위 대비 5.6:1 */
 
   /* 데스크톱에서 폰 프레임 바깥 */
-  --color-desk: #dce6de;
+  --color-desk: #e4dac7;
   --color-bezel: #13231a;
 }
 

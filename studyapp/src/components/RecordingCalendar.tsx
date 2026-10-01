@@ -7,7 +7,7 @@ import { api, ApiError } from '../api/client'
 import { cn } from '../lib/cn'
 import { HOLIDAYS } from '../lib/holidays'
 import { courseTone } from '../lib/courseTone'
-import { Button, Card, CourseBadge, Row, Sheet, Tag } from './ui'
+import { Button, Card, Row, Sheet, Tag } from './ui'
 
 // 학습 탭 캘린더: 휴대폰 달력처럼 칸 안에 그날 녹음 제목을 과목 색 띠로 보여준다.
 // 제목이 길면 줄을 넘기고, 그 주(한 줄) 칸이 알아서 커진다. 공휴일은 빨간 날짜와 띠로.
@@ -94,7 +94,7 @@ export function RecordingCalendar({
         {/* 요일 */}
         <div className="grid grid-cols-7 border-b-2 border-line text-center text-[13px] font-semibold">
           {WEEK.map((w, i) => (
-            <span key={w} className={cn('py-1.5', i === 0 ? 'text-danger' : i === 6 ? 'text-sky-600' : 'text-muted')}>
+            <span key={w} className={cn('py-1.5', i === 0 ? 'text-danger' : i === 6 ? 'text-saturday' : 'text-muted')}>
               {w}
             </span>
           ))}
@@ -132,7 +132,7 @@ export function RecordingCalendar({
                         : i === 0 || holiday
                           ? 'text-danger'
                           : i === 6
-                            ? 'text-sky-600'
+                            ? 'text-saturday'
                             : 'text-ink',
                     )}
                   >
@@ -192,7 +192,6 @@ export function RecordingCalendar({
                 <li key={l.id}>
                   <Row
                     to={`/lectures/${l.id}`}
-                    leading={<CourseBadge course={l.course} />}
                     title={l.title}
                     meta={<span className="tabular-nums">{l.durationMin}분 녹음</span>}
                     trailing={l.status === 'processing' ? <Tag tone="accent">요약 중</Tag> : null}
@@ -280,7 +279,6 @@ function AddToDateSheet({
               onChange={() => setPicked(l.id)}
               className="size-4 cursor-pointer accent-primary"
             />
-            <CourseBadge course={l.course} className="size-8" />
             <span className="min-w-0">
               <span className="block truncate text-[15px] font-bold">{l.title}</span>
               <span className="block text-[12px] text-muted tabular-nums">지금 날짜 {l.recordedAt}</span>

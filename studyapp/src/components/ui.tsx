@@ -2,7 +2,6 @@ import { useEffect, type ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { courseTone } from '../lib/courseTone'
 
 // 반복해서 쓰는 작은 조각들. 블록형: 두꺼운 테두리 + 아래로만 떨어지는 단색 그림자.
 // 터치 대상은 최소 44px(h-11) 이상.
@@ -134,22 +133,6 @@ export function Tag({
       )}
     >
       {children}
-    </span>
-  )
-}
-
-// 과목 배지: 과목 색(lib/courseTone) + 첫 글자
-export function CourseBadge({ course, className }: { course: string; className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'flex size-11 shrink-0 items-center justify-center rounded-xl text-base font-bold',
-        courseTone(course),
-        className,
-      )}
-    >
-      {course.slice(0, 1)}
     </span>
   )
 }

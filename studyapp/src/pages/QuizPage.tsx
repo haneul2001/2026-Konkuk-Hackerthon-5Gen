@@ -18,7 +18,6 @@ import {
   Button,
   ButtonLink,
   Card,
-  CourseBadge,
   ListSkeleton,
   PageTitle,
   Row,
@@ -158,7 +157,6 @@ function Setup({ onStart }: { onStart: (quiz: Quiz) => void }) {
         ) : (
           <>
             <Card className="flex items-center gap-3 p-4">
-              <CourseBadge course={review.course} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold">{review.lectureTitle}</p>
                 <p className="mt-0.5 text-[13px] text-muted">
@@ -231,7 +229,6 @@ function Setup({ onStart }: { onStart: (quiz: Quiz) => void }) {
                 <li key={l.id}>
                   <Row
                     onClick={() => setParams({ lecture: l.id }, { replace: true, state: { scrollTop: true } })}
-                    leading={<CourseBadge course={l.course} />}
                     title={l.title}
                     meta={`개념 ${concepts.filter((c) => c.lectureId === l.id).length}개`}
                   />

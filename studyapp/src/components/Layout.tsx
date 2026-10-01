@@ -88,7 +88,7 @@ export function Layout() {
       {/* 상단 배너: 상태바 아래 화면 폭 가득 건국대 초록 띠, 네 면 모두 연두 외곽선 */}
       {!immersive && (
         <div className="relative z-10 mt-[env(safe-area-inset-top)] mb-1 shrink-0 border border-b-2 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
-          <TopBar isRoot={isRoot} isHome={pathname === '/'} avatar={avatar} />
+          <TopBar isRoot={isRoot} avatar={avatar} />
         </div>
       )}
 
@@ -147,7 +147,7 @@ export function StatusBar() {
   )
 }
 
-function TopBar({ isRoot, isHome, avatar }: { isRoot: boolean; isHome: boolean; avatar: string }) {
+function TopBar({ isRoot, avatar }: { isRoot: boolean; avatar: string }) {
   const navigate = useNavigate()
   const { key } = useLocation()
 
@@ -155,12 +155,8 @@ function TopBar({ isRoot, isHome, avatar }: { isRoot: boolean; isHome: boolean; 
     <header className="flex h-14 shrink-0 items-center justify-between px-3">
       {isRoot ? (
         <span className="px-2 text-[20px] font-extrabold tracking-tight">
-          {isHome && (
-            <>
-              <span className="text-highlight">{APP_NAME.slice(0, 1)}</span>
-              {APP_NAME.slice(1)}
-            </>
-          )}
+          <span className="text-highlight">{APP_NAME.slice(0, 1)}</span>
+          {APP_NAME.slice(1)}
         </span>
       ) : (
         <button

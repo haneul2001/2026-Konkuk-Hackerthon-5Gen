@@ -4,7 +4,7 @@ import { CalendarClock, CircleAlert, Layers, Loader, Megaphone, Play } from 'luc
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
-import { ButtonLink, Card, CourseBadge, Segmented, Tag } from '../components/ui'
+import { ButtonLink, Card, Segmented, Tag } from '../components/ui'
 import { clock } from '../lib/time'
 
 // 강의 상세: 듣기(TTS) · 퀴즈(문제 풀기·플래시카드) · 전체 요약 탭. 기본은 듣기.
@@ -62,8 +62,7 @@ export function LecturePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-3">
-        <CourseBadge course={lecture.course} className="size-12" />
+      <div>
         <div className="min-w-0">
           <h1 className="text-[22px] leading-tight font-bold text-balance">{lecture.title}</h1>
           <p className="mt-1.5 flex items-center gap-2 text-[13px] text-muted">

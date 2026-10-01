@@ -84,7 +84,7 @@ export function HomePage() {
           value={me ? me.xpThisWeek.toLocaleString() : '—'}
         />
         <Stat
-          icon={<Trophy className="size-5 text-amber-500" fill="currentColor" aria-hidden />}
+          icon={<Trophy className="size-5 text-highlight-deep" fill="currentColor" aria-hidden />}
           label="리그 순위"
           value={me ? `${me.leagueRank}위` : '—'}
         />

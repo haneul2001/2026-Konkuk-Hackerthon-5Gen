@@ -50,9 +50,9 @@ export function RankingPage() {
               <div
                 className={cn(
                   'mt-2 flex w-full items-start justify-center rounded-t-xl pt-2 text-xl font-extrabold tabular-nums',
-                  e.rank === 1 && 'h-24 bg-accent text-white',
-                  e.rank === 2 && 'h-16 bg-accent-soft text-accent-ink',
-                  e.rank === 3 && 'h-12 bg-line text-ink',
+                  e.rank === 1 && 'h-24 bg-highlight text-primary-deep',
+                  e.rank === 2 && 'h-16 bg-line-strong text-ink',
+                  e.rank === 3 && 'h-12 bg-accent-soft text-accent-ink',
                 )}
               >
                 {e.rank}

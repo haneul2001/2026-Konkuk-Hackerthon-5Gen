@@ -4,7 +4,7 @@ import { Folder as FolderIcon, Plus, X } from 'lucide-react'
 import type { Lecture, RecordingFolder } from '../../shared/types'
 import { api } from '../api/client'
 import { LIBRARY_NAME } from '../lib/names'
-import { Button, ButtonLink, Card, CourseBadge, ListSkeleton, Row, Sheet, Tag } from '../components/ui'
+import { Button, ButtonLink, Card, ListSkeleton, Row, Sheet, Tag } from '../components/ui'
 import { cn } from '../lib/cn'
 
 // 녹음 폴더 안: 담긴 녹음 목록, 녹음 담기·빼기. 이름 변경·순서·삭제는 학습 탭 폴더 카드의 ⋮에서.
@@ -80,7 +80,6 @@ export function RecordingFolderPage() {
                 <div className="min-w-0 flex-1">
                   <Row
                     to={`/lectures/${l.id}`}
-                    leading={<CourseBadge course={l.course} />}
                     title={l.title}
                     meta={<span className="tabular-nums">{l.durationMin}분 녹음</span>}
                     trailing={l.status === 'processing' ? <Tag tone="accent">요약 중</Tag> : null}
@@ -154,7 +153,6 @@ function LecturePicker({
                 }}
                 className="size-4 cursor-pointer accent-primary"
               />
-              <CourseBadge course={l.course} className="size-8" />
               <span className="min-w-0">
                 <span className="block truncate text-[15px] font-bold">{l.title}</span>
                 <span className="block text-[12px] text-muted tabular-nums">{l.durationMin}분 녹음</span>
