@@ -238,7 +238,7 @@ export function LibraryPage() {
             )}
           </div>
 
-          {/* 과목·태그 필터. 가로로 넘친다. 한 번에 하나만 고른다 */}
+          {/* 과목·태그 필터. 넘치면 다음 줄로. 한 번에 하나만 고른다 */}
           <div className="flex flex-wrap gap-2" role="group" aria-label="과목·태그">
             {['', ...courses].map((c) => (
               <Chip
