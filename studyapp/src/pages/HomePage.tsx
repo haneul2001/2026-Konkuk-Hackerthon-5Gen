@@ -13,7 +13,6 @@ import { api } from '../api/client'
 import {
   ButtonLink,
   Card,
-  CourseBadge,
   EmptyState,
   ListSkeleton,
   Row,
@@ -22,6 +21,7 @@ import {
 } from '../components/ui'
 import { LIBRARY_NAME } from '../lib/names'
 import { Mascot } from '../components/Mascot'
+import { Avatar } from '../components/Avatar'
 import { currentStreak, daysSinceStudy, moodOf, solvedToday } from '../../shared/mood'
 import { mascotLine, pickLineIndex } from '../lib/mascotLines'
 import { cn } from '../lib/cn'
@@ -248,7 +248,7 @@ export function HomePage() {
                   <li key={p.id}>
                     <Row
                       to={`/board?post=${p.id}`}
-                      leading={<CourseBadge course={s.course} />}
+                      leading={<Avatar id={p.avatar ?? ''} className="size-11 border-2 border-line" />}
                       title={p.title}
                       meta={
                         <span className="tabular-nums">
