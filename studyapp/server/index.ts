@@ -36,6 +36,7 @@ import { currentNotices } from '../shared/notices'
 import { folders, league, me, recordingFolders, todayReviews } from '../shared/mock'
 import { submitQuiz, type GradedResult } from '../shared/quiz'
 import { finishCardSet } from '../shared/cards'
+import { seedDemo } from '../shared/demo'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
 // XP·리그·연속 학습일·오늘 복습·폴더·게시판은 여기서 목 데이터로 처리한다.
@@ -43,6 +44,9 @@ import { finishCardSet } from '../shared/cards'
 // 실행: npm run server  (포트 3001)
 
 const AI = process.env.AI_SERVER ?? 'http://localhost:8000'
+
+// 시연용 더미 데이터(리그 상대·게시글·내 기록). Render 환경변수 DEMO_SEED=1 일 때만
+if (process.env.DEMO_SEED === '1') seedDemo()
 
 const app = express()
 app.use(cors())
