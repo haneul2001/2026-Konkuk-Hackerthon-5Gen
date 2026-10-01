@@ -210,6 +210,7 @@ export type Quiz = {
   title: string
   source: QuizSource
   questions: QuizQuestion[]
+  notice?: string | null // 요청보다 적게 냈을 때 이유 (개념이 적어서 등). 첫 문제 위에 띄운다
   meta?: Record<string, unknown> // AI 서버의 재출제·생성 통계
 }
 

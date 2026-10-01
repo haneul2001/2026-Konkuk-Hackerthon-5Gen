@@ -116,6 +116,13 @@ export function QuizPlayer({
         </span>
       </div>
 
+      {/* 요청보다 적게 나왔을 때 이유 (첫 문제에서만) */}
+      {index === 0 && quiz.notice && (
+        <p role="status" className="mt-1 rounded-xl bg-accent-soft px-3.5 py-2.5 text-[14px] leading-snug text-pretty text-accent-ink">
+          {quiz.notice}
+        </p>
+      )}
+
       {/* 문제 */}
       <div className="pt-4 pb-6">
         <Tag tone="primary">{typeLabel[q.type]}</Tag>
