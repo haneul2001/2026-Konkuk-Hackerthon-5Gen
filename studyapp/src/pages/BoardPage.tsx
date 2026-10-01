@@ -6,12 +6,13 @@ import {
   EllipsisVertical,
   ExternalLink,
   MessageCircle,
-  Siren, Pencil, Search, SendHorizontal, ThumbsUp, UserRound, X } from 'lucide-react'
+  Siren, Pencil, Search, SendHorizontal, ThumbsUp, X } from 'lucide-react'
 import { REPORT_REASONS } from '../../shared/types'
 import type { BoardComment, BoardKind, BoardPost, ReportReason, UserSummary } from '../../shared/types'
 import { BOARDS, cleanTags, matches } from '../../shared/board'
 import { api } from '../api/client'
 import { Button, Field, ListSkeleton, PageTitle, Segmented, Sheet, Tag } from '../components/ui'
+import { Avatar } from '../components/Avatar'
 import { cn } from '../lib/cn'
 import { timeAgo } from '../lib/time'
 
@@ -302,9 +303,7 @@ function PostDetail({ id }: { id: string }) {
       <p className="text-[13px] font-semibold text-primary">{boardLabel[post.board]}</p>
 
       <div className="mt-3 flex items-center gap-2.5">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary" aria-hidden>
-          <UserRound className="size-5" />
-        </span>
+        <Avatar id={post.avatar ?? ''} className="size-10 border-2 border-line" />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-bold">{post.author}</p>
           <p className="text-[12px] text-muted">
@@ -627,7 +626,10 @@ function CommentItem({
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className={cn('text-[14px] font-bold', c.isWriter && 'text-primary')}>{c.author}</p>
+        <p className={cn('flex min-w-0 items-center gap-2 text-[14px] font-bold', c.isWriter && 'text-primary')}>
+          <Avatar id={c.avatar ?? ''} className="size-7 border border-line" />
+          <span className="truncate">{c.author}</span>
+        </p>
         {actions.length > 0 && (
           <div className="relative -my-1.5 flex shrink-0 items-center rounded-lg bg-line/50 text-muted">
             {actions.map((a, i) => (

@@ -3,6 +3,7 @@ import { Clock, Flame, Headphones, Layers, ListChecks, RotateCcw } from 'lucide-
 import type { LeagueEntry, UserSummary } from '../../shared/types'
 import { api } from '../api/client'
 import { Card, ListSkeleton, PageTitle, Placeholder, Section } from '../components/ui'
+import { Avatar } from '../components/Avatar'
 import { cn } from '../lib/cn'
 
 const xpWays = [
@@ -43,9 +44,7 @@ export function RankingPage() {
         <div className="grid grid-cols-3 items-end gap-2.5">
           {[top[1], top[0], top[2]].map((e) => (
             <div key={e.rank} className="flex flex-col items-center">
-              <span className="flex size-12 items-center justify-center rounded-full border-2 border-line-strong bg-surface text-base font-bold">
-                {e.name.slice(0, 1)}
-              </span>
+              <Avatar id={e.avatar} className="size-14 border-2 border-line-strong" />
               <p className="mt-1.5 text-sm font-bold">{e.name}</p>
               <p className="text-xs text-muted tabular-nums">{e.xpThisWeek} XP</p>
               <div
@@ -81,6 +80,7 @@ export function RankingPage() {
                   <span className="w-6 text-center font-bold tabular-nums text-muted">
                     {e.rank}
                   </span>
+                  <Avatar id={e.avatar} className="size-9 border-2 border-line" />
                   <span className={cn('flex-1', e.isMe && 'font-bold')}>
                     {e.name}
                     {e.isMe && <span className="ml-1.5 text-[13px] text-primary">나</span>}

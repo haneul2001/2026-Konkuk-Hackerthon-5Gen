@@ -40,6 +40,7 @@ export type UserSummary = {
   lastStudyDate: string // 마지막으로 문제를 푼 날 (YYYY-MM-DD, 로컬 기준)
   todaySolved: number // lastStudyDate에 푼 문제 수
   dailyGoal: number // 하루 목표 문제 수
+  avatar?: string // 고른 프로필 사진(shared/avatars.ts). 없으면 아이디로 정한다
 }
 
 // 마스코트 기분. 순서대로 헬쑥함(30일+) → 매우매우 기쁨.
@@ -58,6 +59,7 @@ export type Notice = {
 export type LeagueEntry = {
   rank: number
   name: string
+  avatar: string
   xpThisWeek: number
   isMe?: boolean
 }
@@ -85,6 +87,7 @@ export type BoardPost = {
   anonymous: boolean
   author: string // 화면에 띄울 이름. 익명이면 '익명'
   authorId: string // 내 글인지, 댓글 '글쓴이' 표시에 쓴다
+  avatar?: string // 보여 줄 때 붙인다. 익명이면 글마다 달라서 누군지 알 수 없다
   likes: number
   liked: boolean // 내가 공감했는지
   commentCount: number
@@ -101,6 +104,7 @@ export type BoardComment = {
   body: string
   author: string // 익명이면 '익명1', '익명2'… 글쓴이면 '익명(글쓴이)'
   authorId: string
+  avatar?: string // 보여 줄 때 붙인다
   isWriter: boolean
   createdAt: string
   parentId?: string // 대댓글이면 원댓글 id. 에타처럼 한 단계만 들어간다

@@ -123,7 +123,7 @@ export const api = {
   // 로그인 화면용: 둘러보기 버튼을 보일지
   guestAllowed: async () => (await get<{ guest?: boolean }>('/api/health', {})).guest === true,
   me: () => get<UserSummary>('/api/me', current().me),
-  updateProfile: (patch: { name?: string; dailyGoal?: number }) =>
+  updateProfile: (patch: { name?: string; dailyGoal?: number; avatar?: string }) =>
     send<UserSummary | { error: string }>('PATCH', '/api/me', patch, () => profile.updateProfile(patch)),
   blocks: () => get<{ count: number }>('/api/blocks', board.blockedCount()),
   unblockAll: () => send<{ count: number }>('DELETE', '/api/blocks', {}, () => board.unblockAll()),

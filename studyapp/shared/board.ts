@@ -1,5 +1,6 @@
 import { comments, posts, studyContacts } from './mock'
-import { current } from './session'
+import { avatarFor } from './avatars'
+import { avatarOf, current } from './session'
 import { REPORT_REASONS } from './types'
 import type { BoardComment, BoardKind, BoardPost, NewPost, Report, ReportReason } from './types'
 
@@ -37,6 +38,7 @@ function view(p: BoardPost): BoardPost {
   return {
     ...p,
     mine,
+    avatar: p.anonymous ? avatarFor(p.id) : avatarOf(p.authorId),
     study: p.study && {
       ...p.study,
       joinedByMe: joined,
@@ -84,6 +86,7 @@ function viewComment(c: BoardComment): BoardComment {
     liked: !!c.liked,
     mine: c.authorId === current().me.id,
     blocked,
+    avatar: /^익명/.test(c.author) ? avatarFor(`${c.postId}:${c.author}`) : avatarOf(c.authorId),
   }
 }
 

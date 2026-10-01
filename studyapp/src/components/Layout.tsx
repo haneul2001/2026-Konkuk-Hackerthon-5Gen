@@ -18,6 +18,8 @@ import { api } from '../api/client'
 import { ImmersiveContext } from '../lib/immersive'
 import { NotifyContext } from '../lib/notify'
 import { NoticeBanner } from './NoticeBanner'
+import { Avatar } from './Avatar'
+import { avatarOfMe } from '../../shared/avatars'
 import { APP_NAME, LIBRARY_NAME } from '../lib/names'
 
 
@@ -57,10 +59,10 @@ export function Layout() {
   }, [])
   const dismiss = useCallback(() => setQueue((q) => q.slice(1)), [])
 
-  // 프로필 버튼에 이름 첫 글자. 프로필에서 이름을 바꿀 수 있어서 화면을 옮길 때마다 다시 읽는다.
-  const [initial, setInitial] = useState('')
+  // 프로필 버튼에 내 프로필 사진. 프로필에서 바꿀 수 있어서 화면을 옮길 때마다 다시 읽는다.
+  const [avatar, setAvatar] = useState('')
   useEffect(() => {
-    api.me().then((m) => setInitial(m.name.slice(0, 1)))
+    api.me().then((m) => setAvatar(avatarOfMe(m)))
   }, [pathname])
 
   // 앱을 열 때 한 번: 지금 상태로 생기는 알림(복습, 연속 기록 위험 등)을 띄운다.
@@ -86,7 +88,7 @@ export function Layout() {
       {/* 상단 배너: 상태바 아래 화면 폭 가득 건국대 초록 띠, 네 면 모두 연두 외곽선 */}
       {!immersive && (
         <div className="relative z-10 mt-[env(safe-area-inset-top)] mb-1 shrink-0 border border-b-2 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
-          <TopBar isRoot={isRoot} isHome={pathname === '/'} initial={initial} />
+          <TopBar isRoot={isRoot} isHome={pathname === '/'} avatar={avatar} />
         </div>
       )}
 
@@ -145,7 +147,7 @@ export function StatusBar() {
   )
 }
 
-function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean; initial: string }) {
+function TopBar({ isRoot, isHome, avatar }: { isRoot: boolean; isHome: boolean; avatar: string }) {
   const navigate = useNavigate()
   const { key } = useLocation()
 
@@ -190,14 +192,14 @@ function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean;
           className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-highlight"
         >
           {({ isActive }) => (
-            <span
-              className={cn(
-                'flex size-9 items-center justify-center rounded-full border-2 border-highlight text-sm font-bold',
-                isActive ? 'bg-highlight text-primary-deep' : 'bg-white/10 text-white',
-              )}
-            >
-              {initial}
-            </span>
+            avatar ? (
+              <Avatar
+                id={avatar}
+                className={cn('size-9 border-2', isActive ? 'border-highlight bg-highlight' : 'border-highlight bg-white')}
+              />
+            ) : (
+              <span className="size-9 rounded-full border-2 border-highlight bg-white/10" />
+            )
           )}
         </NavLink>
       </div>

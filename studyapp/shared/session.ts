@@ -1,3 +1,4 @@
+import { avatarFor, isAvatar } from './avatars'
 import type { Folder, LeagueEntry, RecordingFolder, ReviewItem, UserSummary } from './types'
 
 // 사용자별 상태. 로그인한 사람마다 하나씩 있고, shared/*.ts 로직은 전역 변수 대신 current()를 본다.
@@ -64,6 +65,12 @@ export const users = new Map<string, UserState>()
 
 // 리그에만 나오는 가상 상대 (시연용 더미). 로그인은 못 한다.
 let opponents: { name: string; xpThisWeek: number }[] = []
+
+// 사용자의 프로필 사진. 고른 게 없거나 계정을 못 찾으면 아이디로 정한다.
+export function avatarOf(userId: string): string {
+  const me = users.get(userId)?.me ?? (current().me.id === userId ? current().me : undefined)
+  return me?.avatar && isAvatar(me.avatar) ? me.avatar : avatarFor(userId)
+}
 export function setLeagueOpponents(list: { name: string; xpThisWeek: number }[]) {
   opponents = list
 }
@@ -73,8 +80,8 @@ export function refreshLeague(viewerId?: string): LeagueEntry[] {
   const pool = [...users.values()].map((u) => u.me)
   if (pool.length === 0) pool.push(current().me) // 브라우저 게스트
   const entries: (LeagueEntry & { id?: string })[] = [
-    ...pool.map((m) => ({ rank: 0, name: m.name, xpThisWeek: m.xpThisWeek, id: m.id })),
-    ...opponents.map((o) => ({ rank: 0, name: o.name, xpThisWeek: o.xpThisWeek })),
+    ...pool.map((m) => ({ rank: 0, name: m.name, avatar: avatarOf(m.id), xpThisWeek: m.xpThisWeek, id: m.id })),
+    ...opponents.map((o) => ({ rank: 0, name: o.name, avatar: avatarFor(o.name), xpThisWeek: o.xpThisWeek })),
   ]
   entries.sort((a, b) => b.xpThisWeek - a.xpThisWeek)
   entries.forEach((e, i) => (e.rank = i + 1))

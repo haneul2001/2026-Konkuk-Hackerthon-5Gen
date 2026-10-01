@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, ChevronRight, Flame, LogOut, Minus, Pencil, Plus, ShieldBan, Trophy, Zap } from 'lucide-react'
+import { Bell, Check, ChevronRight, Flame, LogOut, Minus, Pencil, Plus, ShieldBan, Trophy, Zap } from 'lucide-react'
 import type { BoardPost, UserSummary } from '../../shared/types'
 import { GOAL_MAX, GOAL_MIN } from '../../shared/profile'
 import { currentStreak, moodInfo, moodOf, solvedToday } from '../../shared/mood'
+import { AVATARS, avatarOfMe } from '../../shared/avatars'
 import { api } from '../api/client'
-import { Mascot } from '../components/Mascot'
+import { Avatar } from '../components/Avatar'
 import { Button, Card, Field, ListSkeleton, Row, Section, Sheet, Tag } from '../components/ui'
 import { cn } from '../lib/cn'
 import { timeAgo } from '../lib/time'
 import { clearToken } from '../lib/auth'
 
-// 프로필: 내 학습 기록 한눈에 보기, 이름·하루 목표 바꾸기, 내 활동(글·스터디), 차단 관리.
-// 오른쪽 위 동그란 이름 버튼으로 들어온다.
+// 프로필: 내 학습 기록 한눈에 보기, 사진·이름·하루 목표 바꾸기, 내 활동(글·스터디), 차단 관리.
+// 오른쪽 위 동그란 프로필 사진 버튼으로 들어온다.
 
 const GOAL_STEP = 5
 
@@ -21,6 +22,7 @@ export function ProfilePage() {
   const [posts, setPosts] = useState<BoardPost[] | null>(null)
   const [blocked, setBlocked] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
+  const [picking, setPicking] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function ProfilePage() {
     api.blocks().then((b) => setBlocked(b.count))
   }, [])
 
-  async function save(patch: { name?: string; dailyGoal?: number }) {
+  async function save(patch: { name?: string; dailyGoal?: number; avatar?: string }) {
     const r = await api.updateProfile(patch)
     if ('error' in r) return r.error
     setMe({ ...r })
@@ -47,9 +49,19 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-7">
-      {/* 머리: 소 + 이름 */}
+      {/* 머리: 프로필 사진 + 이름 */}
       <div className="flex items-center gap-4">
-        <Mascot mood={mood} className="w-24 shrink-0" />
+        <button
+          type="button"
+          aria-label="프로필 사진 바꾸기"
+          onClick={() => setPicking(true)}
+          className="relative shrink-0 cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <Avatar id={avatarOfMe(me)} className="size-24 border-2 border-line-strong" />
+          <span className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full border-2 border-surface bg-primary text-white">
+            <Pencil className="size-3.5" aria-hidden />
+          </span>
+        </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
             <h1 className="truncate text-[24px] leading-tight font-bold">{me.name}</h1>
@@ -62,7 +74,7 @@ export function ProfilePage() {
               <Pencil className="size-4" aria-hidden />
             </button>
           </div>
-          <p className="mt-1 text-[14px] text-muted">소 기분: {moodInfo[mood].label}</p>
+          <p className="mt-1 text-[14px] text-muted">쿠 기분: {moodInfo[mood].label}</p>
           {streak > 0 && (
             <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 text-[13px] font-bold text-accent-ink">
               <Flame className="size-4" aria-hidden />
@@ -213,6 +225,16 @@ export function ProfilePage() {
         </Card>
       </Section>
 
+      {picking && (
+        <AvatarSheet
+          current={avatarOfMe(me)}
+          onClose={() => setPicking(false)}
+          onPick={async (avatar) => {
+            const err = await save({ avatar })
+            if (!err) setPicking(false)
+          }}
+        />
+      )}
       {renaming && (
         <RenameSheet current={me.name} onClose={() => setRenaming(false)} onSave={(name) => save({ name })} />
       )}
@@ -256,6 +278,48 @@ function StepButton({
     >
       <Icon className="size-5" strokeWidth={2.5} aria-hidden />
     </button>
+  )
+}
+
+// 프로필 사진 고르기: 누르면 바로 바뀐다
+function AvatarSheet({
+  current,
+  onClose,
+  onPick,
+}: {
+  current: string
+  onClose: () => void
+  onPick: (avatar: string) => void
+}) {
+  return (
+    <Sheet title="프로필 사진" onClose={onClose}>
+      <ul className="grid grid-cols-4 gap-3">
+        {AVATARS.map((id) => {
+          const selected = id === current
+          return (
+            <li key={id}>
+              <button
+                type="button"
+                aria-label={`사진 ${Number(id)}`}
+                aria-pressed={selected}
+                onClick={() => (selected ? onClose() : onPick(id))}
+                className="relative block w-full cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <Avatar
+                  id={id}
+                  className={cn('aspect-square w-full border-2', selected ? 'border-primary' : 'border-line')}
+                />
+                {selected && (
+                  <span className="absolute right-0 bottom-0 flex size-6 items-center justify-center rounded-full bg-primary text-white">
+                    <Check className="size-4" strokeWidth={3} aria-hidden />
+                  </span>
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </Sheet>
   )
 }
 
