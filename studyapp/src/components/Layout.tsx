@@ -88,7 +88,7 @@ export function Layout() {
       {immersive ? (
         <StatusBar />
       ) : (
-        <div className="relative z-10 mb-1 shrink-0 border-b-2 border-highlight bg-primary pt-[env(safe-area-inset-top)] text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
+        <div className="relative z-10 mb-1 shrink-0 border-b-2 border-highlight bg-primary pt-[env(safe-area-inset-top)] text-white shadow-[0_6px_14px_-4px_var(--color-surface)]">
           <StatusBar />
           <TopBar isRoot={isRoot} avatar={avatar} />
         </div>
