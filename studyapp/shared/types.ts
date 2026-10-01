@@ -179,6 +179,9 @@ type QuestionBase = {
   conceptId: string
   prompt: string
   explanation: string
+  // AI 서버가 낸 문제: 묻는 측면(정의, 계산 변형 …)과 난이도. advanced면 심화 문제
+  aspect?: string | null
+  level?: 'basic' | 'advanced'
 }
 
 export type MultipleQuestion = QuestionBase & {

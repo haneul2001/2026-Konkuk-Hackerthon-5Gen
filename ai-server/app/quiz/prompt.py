@@ -4,6 +4,7 @@ SYSTEM_PROMPT = """너는 대학 강의 복습 퀴즈 출제자다. 강의에서
 
 규칙:
 - 주어진 개념 설명과 전사본 발췌에 있는 내용으로만 출제한다. 강의에 나오지 않은 수치, 사례, 용어로 문제를 만들지 않는다.
+  (예외: 측면이 "계산 변형"이면 강의에 나온 계산 방법은 그대로 쓰고 숫자만 바꿀 수 있다)
 - 각 문제의 evidence에는 그 문제의 근거가 된 전사본 문장을 고치지 말고 그대로 복사한다.
 - conceptId에는 문제가 다루는 개념의 id를 주어진 목록에서 그대로 쓴다.
 - 단순 용어 맞히기보다 원리, 차이, 이유, 계산 과정을 이해했는지 묻는다. 교수가 든 예시나 계산이 있으면 활용한다.
@@ -16,6 +17,15 @@ SYSTEM_PROMPT = """너는 대학 강의 복습 퀴즈 출제자다. 강의에서
 
 # 같은 개념에서 서로 다른 측면을 묻게 해, 개념이 적은 강의에서도 문제가 겹치지 않게 한다
 ASPECTS = ["정의", "원리·이유", "비교·차이", "계산·예시", "장단점·한계", "적용 상황"]
+
+# 심화: 기본 측면을 다 냈거나 그 개념을 잘 맞히면 더 어려운 문제를 낸다
+ADVANCED_ASPECTS = ["개념 연결", "상황 적용", "계산 변형", "오개념 찾기"]
+
+ADVANCED_RULES = """심화 측면 문제는 기본 문제보다 한 단계 깊게 낸다.
+- 개념 연결: 이 개념과 "같은 강의의 다른 개념" 하나를 엮어서, 둘의 관계나 함께 적용한 결과를 묻는다.
+- 상황 적용: 구체적인 상황(주소, 접근 순서, 입력 등)을 주고 이 개념을 적용한 결과를 묻는다.
+- 계산 변형: 강의에 나온 계산 방법을 그대로 쓰되 숫자를 바꾼 문제를 낸다. 정답은 강의의 계산 방법대로 한 단계씩 직접 계산해서 확인하고, explanation에 계산 과정을 식으로 쓴다. 강의에 계산이 없으면 이 측면은 상황 적용으로 바꾼다.
+- 오개념 찾기: 학생이 흔히 헷갈릴 만한 틀린 설명을 찾게 한다."""
 
 TYPE_RULES = {
     "multiple": """문제 유형: 객관식
@@ -33,6 +43,7 @@ TYPE_RULES = {
 _COMMON = {
     "conceptId": {"type": "string"},
     "aspect": {"type": "string", "description": "이 문제가 묻는 측면 (괄호 안 목록에서)"},
+    "otherConcept": {"type": "string", "description": "개념 연결이면 엮은 다른 개념 이름, 아니면 빈 문자열"},
     "prompt": {"type": "string"},
     "explanation": {"type": "string"},
     "evidence": {"type": "string", "description": "근거가 된 전사본 문장 (그대로 복사)"},
@@ -71,8 +82,8 @@ def schema_for(qtype: str) -> dict:
     }
 
 
-def build_user_message(qtype: str, plan: list[dict], avoid: list[str]) -> str:
-    """plan: [{id, term, summary, excerpt, count, aspects}]"""
+def build_user_message(qtype: str, plan: list[dict], avoid: list[str], others: list[str] | None = None) -> str:
+    """plan: [{id, term, summary, excerpt, count, aspects}], others: 개념 연결용 같은 강의의 다른 개념 이름"""
     blocks = []
     for c in plan:
         excerpt = c["excerpt"] or "(발췌 없음. 개념 설명만 근거로 쓴다. 이 경우 evidence에는 개념 설명 문장을 그대로 쓴다)"
@@ -83,8 +94,12 @@ def build_user_message(qtype: str, plan: list[dict], avoid: list[str]) -> str:
         )
     total = sum(c["count"] for c in plan)
     avoid_text = "\n".join(f"- {p}" for p in avoid) if avoid else "(없음)"
+    advanced = any(a in ADVANCED_ASPECTS for c in plan for a in c["aspects"])
+    extra = ""
+    if advanced:
+        extra = f"{ADVANCED_RULES}\n같은 강의의 다른 개념: {', '.join(others or []) or '(없음)'}\n\n"
     return (
-        f"{TYPE_RULES[qtype]}\n\n"
+        f"{TYPE_RULES[qtype]}\n\n{extra}"
         f"아래 개념마다 괄호 안의 개수만큼, 모두 {total}문제를 만들어줘.\n\n"
         + "\n\n".join(blocks)
         + f"\n\n## 이미 낸 문제 (겹치지 않게)\n{avoid_text}"

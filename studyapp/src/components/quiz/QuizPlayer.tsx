@@ -125,7 +125,10 @@ export function QuizPlayer({
 
       {/* 문제 */}
       <div className="pt-4 pb-6">
-        <Tag tone="primary">{typeLabel[q.type]}</Tag>
+        <span className="flex flex-wrap gap-1.5">
+          <Tag tone="primary">{typeLabel[q.type]}</Tag>
+          {q.level === 'advanced' && <Tag tone="accent">심화{q.aspect ? ` · ${q.aspect}` : ''}</Tag>}
+        </span>
         <h1 className="mt-3 text-[21px] leading-snug font-bold text-pretty">{q.prompt}</h1>
 
         <div className="mt-6">
