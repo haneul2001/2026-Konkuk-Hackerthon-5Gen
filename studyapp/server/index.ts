@@ -37,7 +37,7 @@ import { currentNotices } from '../shared/notices'
 import { current, refreshLeague, setLeagueOpponents } from '../shared/session'
 import { submitQuiz, type GradedResult } from '../shared/quiz'
 import { finishCardSet } from '../shared/cards'
-import { DEMO_OPPONENTS, seedDemoPosts } from '../shared/demo'
+import { DEMO_OPPONENTS, demoLectures, isDemoLecture, seedDemoPosts } from '../shared/demo'
 import { guestAllowed, guestLogin, login, requireAuth, signup } from './auth'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
@@ -156,8 +156,26 @@ app.get('/api/league', (_req, res) => res.json(refreshLeague()))
 // 업로드(multipart: audio, course, title?, recordedAt?) → 전처리 → STT → 요약 → 개념.
 // 2시간 녹음 기준 2~3분. 그동안 GET /api/lectures/:id 의 status·stage·progress로 진행을 본다.
 app.post('/api/lectures', (req, res) => forward(req, res))
-app.get('/api/lectures', (req, res) => forward(req, res))
-app.get('/api/lectures/:id', (req, res) => forward(req, res))
+// 시연용(DEMO_SEED=1): AI 서버 강의에 시간표 더미 강의(11월~, 월 운영체제·화 C언어·수 파이썬·목 딥러닝)를 끼워 보여 준다
+const DEMO = process.env.DEMO_SEED === '1'
+app.get('/api/lectures', async (req, res) => {
+  if (!DEMO) return forward(req, res)
+  let real: unknown[] = []
+  try {
+    const r = await fetch(AI + req.originalUrl)
+    if (r.ok) real = (await r.json()) as unknown[]
+  } catch {
+    // AI 서버가 꺼져 있어도 더미 강의는 보여 준다
+  }
+  res.json([...real, ...demoLectures()])
+})
+app.get('/api/lectures/:id', (req, res) => {
+  if (DEMO && isDemoLecture(req.params.id)) {
+    const l = demoLectures().find((x) => x.id === req.params.id)
+    return l ? res.json(l) : res.status(404).json({ error: '강의를 찾을 수 없어요' })
+  }
+  forward(req, res)
+})
 // 제목·과목·녹음한 날 바꾸기 (body: { title?, course?, recordedAt? }). 캘린더에서 날짜 옮기기에 쓴다
 app.patch('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))

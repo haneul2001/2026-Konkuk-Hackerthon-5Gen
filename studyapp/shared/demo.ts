@@ -1,9 +1,10 @@
 import { comments, posts, studyContacts } from './mock'
-import type { BoardComment, BoardPost } from './types'
+import type { BoardComment, BoardPost, Lecture } from './types'
 
 // 시연·테스트용 더미 데이터. DEMO_SEED=1 일 때만 쓴다.
 //  - 리그 상대 7명: 리그에만 나오는 가상 사용자. 로그인은 못 한다 (session.setLeagueOpponents)
 //  - 게시글 5개·댓글 4개: 저장된 글이 하나도 없을 때 한 번만 채운다. 그 뒤로는 DB에 남는다
+//  - 시간표 강의: 11월부터 월 운영체제·화 C언어·수 파이썬·목 딥러닝. 저장하지 않고 강의 목록에 끼워 보여 준다
 // 로그인이 생겨서 '내 기록'은 더 이상 채우지 않는다. 가입한 사용자가 직접 쌓는다.
 
 export const DEMO_OPPONENTS = [
@@ -74,4 +75,37 @@ export function seedDemoPosts(): boolean {
   )
   for (const p of posts) p.commentCount = comments.filter((c) => c.postId === p.id).length
   return true
+}
+
+// ---- 시간표 더미 강의 ----
+// 캘린더에 짧게 들어가도록 제목은 'N주 과목'(예: 10주 딥러닝). 주차는 2학기 개강 주(8/31) 기준.
+// AI 서버에 없는 강의라 id가 lec_demo_로 시작하고, 요약·녹음 원본은 없다.
+
+const DEMO_TIMETABLE: Record<number, string> = { 1: '운영체제', 2: 'C언어', 3: '파이썬', 4: '딥러닝' } // 요일(월=1) → 과목
+const DEMO_FROM = '2026-11-01'
+const DEMO_TO = '2026-12-18' // 2학기 종강 무렵까지
+const SEMESTER_START = Date.parse('2026-08-31T00:00:00Z') // 2학기 1주 월요일
+
+export const isDemoLecture = (id: string) => id.startsWith('lec_demo_')
+
+export function demoLectures(): Lecture[] {
+  const list: Lecture[] = []
+  const end = Date.parse(`${DEMO_TO}T00:00:00Z`)
+  for (let t = Date.parse(`${DEMO_FROM}T00:00:00Z`); t <= end; t += 86_400_000) {
+    const day = new Date(t)
+    const course = DEMO_TIMETABLE[day.getUTCDay()]
+    if (!course) continue
+    const date = day.toISOString().slice(0, 10)
+    list.push({
+      id: `lec_demo_${date.replaceAll('-', '')}`,
+      title: `${Math.floor((t - SEMESTER_START) / (7 * 86_400_000)) + 1}주 ${course}`,
+      course,
+      recordedAt: date,
+      durationMin: 75,
+      status: 'ready',
+      cardCount: 0,
+      quizCount: 0,
+    })
+  }
+  return list
 }
