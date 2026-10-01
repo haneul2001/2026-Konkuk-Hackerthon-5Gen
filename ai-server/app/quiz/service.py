@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import Concept, Lecture, Question, Quiz, new_id
+from app.db import Concept, ConceptResource, Lecture, Question, Quiz, new_id
 from app.quiz import prompt
 from app.summarize.pipeline import Grounder
 from app.summarize.providers import DEFAULT_PROVIDER, SummaryError, call
@@ -249,6 +249,14 @@ def to_frontend(q: Question, shuffle_choices: bool = True) -> dict:
     return data
 
 
+def _resources(db: Session, q: Question) -> list[dict]:
+    """틀렸을 때 보여줄 그 개념의 공부 자료 링크"""
+    rows = db.scalars(
+        select(ConceptResource).where(ConceptResource.concept_id == q.concept_id).order_by(ConceptResource.position)
+    ).all()
+    return [{"kind": r.kind, "source": r.source, "title": r.title, "url": r.url, "snippet": r.snippet} for r in rows]
+
+
 def build_quiz(
     db: Session,
     source: dict,
@@ -309,7 +317,8 @@ def build_quiz(
         "title": title,
         "source": source,
         # retry: 전에 틀려서 다시 낸 문제 (화면에서 "다시 도전" 표시용)
-        "questions": [{**to_frontend(q), "retry": q in reused} for q in questions],
+        # resources: 틀렸을 때 보여줄 그 개념의 공부 자료 링크
+        "questions": [{**to_frontend(q), "retry": q in reused, "resources": _resources(db, q)} for q in questions],
         "meta": stats,
     }
 
@@ -336,7 +345,12 @@ def build_review_quiz(db: Session, lecture_id: str, reason: str, count: int, rev
     for q in questions:
         q.times_asked += 1
     db.flush()
-    return {"id": quiz.id, "title": lecture.title, "source": source, "questions": [to_frontend(q) for q in questions]}
+    return {
+        "id": quiz.id,
+        "title": lecture.title,
+        "source": source,
+        "questions": [{**to_frontend(q), "resources": _resources(db, q)} for q in questions],
+    }
 
 
 # ---------- 채점 결과 반영 ----------

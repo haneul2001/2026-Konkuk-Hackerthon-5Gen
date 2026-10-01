@@ -21,9 +21,11 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import config, stt, vocab
+import logging
+
+from app import cards, config, resources, stt, vocab
 from app.audio import PRESETS, preprocess, probe_duration
-from app.db import Concept, Course, Lecture, Question, SessionLocal, init_db
+from app.db import Card, Concept, ConceptResource, Course, Lecture, Question, SessionLocal, init_db
 from app.quiz import service as quiz_service
 from app.summarize.pipeline import summarize
 from app.summarize.providers import DEFAULT_PROVIDER, LOCAL_PROVIDERS, PROVIDERS, SummaryError
@@ -101,14 +103,21 @@ def _vocab_for(lecture_id: str) -> tuple[list[str], dict[str, str], list[str]]:
         return vocab.merge_terms(lecture_terms, course_terms), corrections, lecture_terms
 
 
+log = logging.getLogger(__name__)
+
+
 def _delete_concepts(db: Session, lecture_id: str) -> None:
-    # SQLite는 외래 키 CASCADE가 기본으로 꺼져 있어서 문제부터 직접 지운다
+    # SQLite는 외래 키 CASCADE가 기본으로 꺼져 있어서 개념에 딸린 것부터 직접 지운다
+    concept_ids = select(Concept.id).where(Concept.lecture_id == lecture_id)
+    db.execute(delete(ConceptResource).where(ConceptResource.concept_id.in_(concept_ids)))
+    cards.delete_cards(db, lecture_id)
     db.execute(delete(Question).where(Question.lecture_id == lecture_id))
     db.execute(delete(Concept).where(Concept.lecture_id == lecture_id))
 
 
 def _save_summary(lecture_id: str, result) -> None:
-    """요약 결과를 저장하고 개념 카드를 만든다. 다시 요약하면 이전 개념과 문제는 지운다."""
+    """요약 결과와 개념을 저장한다. 다시 요약하면 이전 개념·문제·큐카드·자료는 지운다.
+    status는 큐카드와 자료까지 만든 뒤 done으로 바꾼다 (_summarize_step)."""
     with SessionLocal.begin() as db:
         lec = db.get(Lecture, lecture_id)
         _delete_concepts(db, lecture_id)
@@ -117,11 +126,33 @@ def _save_summary(lecture_id: str, result) -> None:
         if lec.title_auto and result.summary.get("title"):
             week = lec.title.split(" — ")[0]
             lec.title = f"{week} — {result.summary['title']}"
-        lec.status = "done"
         lec.summary = result.summary
         lec.summary_provider = result.provider
         lec.summary_model = result.model
         lec.error = None
+
+
+def _attach_resources(lecture_id: str, provider: str) -> None:
+    """개념마다 틀렸을 때 볼 공부 자료 링크를 찾아 저장한다 (위키백과, 신뢰 블로그)."""
+    with SessionLocal() as db:
+        lec = db.get(Lecture, lecture_id)
+        course = db.get(Course, lec.course_id) if lec.course_id else None
+        concepts = db.scalars(select(Concept).where(Concept.lecture_id == lecture_id)).all()
+        items = [{"id": c.id, "term": c.term, "summary": c.summary} for c in concepts]
+    links = resources.find_resources(items, course.name if course else "", provider)
+    with SessionLocal.begin() as db:
+        for cid, found in links.items():
+            db.execute(delete(ConceptResource).where(ConceptResource.concept_id == cid))
+            urls = set()
+            for i, r in enumerate(found):
+                if r["url"] not in urls:
+                    urls.add(r["url"])
+                    db.add(ConceptResource(concept_id=cid, position=i, **r))
+
+
+def _make_cards(lecture_id: str, provider: str) -> None:
+    with SessionLocal.begin() as db:
+        cards.generate_cards(db, lecture_id, provider)
 
 
 def _summarize_step(lecture_id: str, transcript: str, terms: str | None, provider: str) -> None:
@@ -130,6 +161,13 @@ def _summarize_step(lecture_id: str, transcript: str, terms: str | None, provide
         # Whisper와 로컬 LLM이 동시에 GPU에 올라가면 VRAM이 넘쳐 극단적으로 느려진다
         stt.unload_model()
     _save_summary(lecture_id, summarize(transcript, terms, provider))
+    # 큐카드와 자료 링크는 부가 단계라 실패해도 강의는 ready로 둔다 (각각 다시 만드는 API가 있다)
+    for name, step in (("cards", _make_cards), ("resources", _attach_resources)):
+        try:
+            step(lecture_id, provider)
+        except Exception as e:
+            log.warning("%s step failed for %s: %s", name, lecture_id, e)
+    _set(lecture_id, status="done")
 
 
 def _run_pipeline(lecture_id: str, src: Path, preset: str, provider: str) -> None:
@@ -177,7 +215,7 @@ def _resummarize(lecture_id: str, provider: str) -> None:
 def _lecture_out(db: Session, lec: Lecture) -> dict:
     """shared/types.ts 의 Lecture + 추가 필드(stage, progress, error, overview, announcements)"""
     course = db.get(Course, lec.course_id) if lec.course_id else None
-    card_count = db.scalar(select(func.count()).select_from(Concept).where(Concept.lecture_id == lec.id))
+    card_count = db.scalar(select(func.count()).select_from(Card).where(Card.lecture_id == lec.id))
     quiz_count = db.scalar(select(func.count()).select_from(Question).where(Question.lecture_id == lec.id))
     summary = lec.summary or {}
     return {
@@ -198,7 +236,19 @@ def _lecture_out(db: Session, lec: Lecture) -> dict:
     }
 
 
-def _concept_out(c: Concept, lec: Lecture, course_name: str) -> dict:
+def _resources_of(db: Session, concept_ids: list[str]) -> dict[str, list[dict]]:
+    rows = db.scalars(
+        select(ConceptResource).where(ConceptResource.concept_id.in_(concept_ids)).order_by(ConceptResource.position)
+    ).all()
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        out.setdefault(r.concept_id, []).append(
+            {"kind": r.kind, "source": r.source, "title": r.title, "url": r.url, "snippet": r.snippet}
+        )
+    return out
+
+
+def _concept_out(c: Concept, lec: Lecture, course_name: str, links: list[dict]) -> dict:
     return {
         "id": c.id,
         "term": c.term,
@@ -207,6 +257,7 @@ def _concept_out(c: Concept, lec: Lecture, course_name: str) -> dict:
         "lectureTitle": lec.title,
         "course": course_name,
         "mastery": c.mastery,
+        "resources": links,  # 공부 자료 링크 (studyapp 타입에 없는 추가 필드)
     }
 
 
@@ -331,6 +382,105 @@ def resummarize(lecture_id: str, provider: str = DEFAULT_PROVIDER):
         return _lecture_out(db, db.get(Lecture, lecture_id))
 
 
+@app.post("/api/lectures/{lecture_id}/resources")
+def rebuild_resources(lecture_id: str, provider: str = DEFAULT_PROVIDER):
+    """개념별 공부 자료 링크를 다시 찾는다 (자료 기능이 생기기 전에 요약한 강의에도 쓴다)."""
+    _check_provider(provider)
+    with SessionLocal() as db:
+        _get_lecture(db, lecture_id)
+    _attach_resources(lecture_id, provider)
+    return list_concepts(lecture_id)
+
+
+# ---------- 큐카드 ----------
+
+
+class CardSessionIn(BaseModel):
+    count: int | None = Field(None, description="세트에 넣을 카드 수. 없으면 강의 카드 전부 (다시 볼 카드·몰라요 카드가 앞)")
+
+
+class CardSubmitIn(BaseModel):
+    results: list[dict] = Field(description="[{cardId, known: true | false}]")
+
+
+@app.get("/api/lectures/{lecture_id}/cards")
+def get_cards(lecture_id: str):
+    """강의의 큐카드 전체 (box: 라이트너 상자 1~5, 아직 안 본 카드는 null)"""
+    with SessionLocal() as db:
+        _get_lecture(db, lecture_id)
+        return cards.list_cards(db, lecture_id)
+
+
+@app.post("/api/lectures/{lecture_id}/cards")
+def regenerate_cards(lecture_id: str, provider: str = DEFAULT_PROVIDER):
+    """큐카드를 다시 만든다 (이 강의의 카드 학습 기록은 지워진다)."""
+    _check_provider(provider)
+    with SessionLocal() as db:
+        _get_lecture(db, lecture_id)
+    try:
+        with SessionLocal.begin() as db:
+            stats = cards.generate_cards(db, lecture_id, provider)
+    except SummaryError as e:
+        raise HTTPException(502, f"큐카드를 만들지 못했어요: {e}") from e
+    with SessionLocal() as db:
+        return {"stats": stats, "cards": cards.list_cards(db, lecture_id)}
+
+
+@app.post("/api/lectures/{lecture_id}/card-sessions")
+def start_card_session(lecture_id: str, body: CardSessionIn | None = None):
+    """큐카드 한 세트 시작. 카드가 없으면 null."""
+    count = body.count if body and body.count else None
+    with SessionLocal.begin() as db:
+        _get_lecture(db, lecture_id)
+        return cards.start_session(db, lecture_id, max(1, count) if count else None)
+
+
+@app.post("/api/card-sessions/{session_id}/submit")
+def submit_card_session(session_id: str, body: CardSubmitIn):
+    """알아요/몰라요 반영. finished=true면 한 세트를 끝까지 본 것 (Express가 XP를 준다)."""
+    with SessionLocal.begin() as db:
+        result = cards.submit_session(db, session_id, body.results)
+    if result is None:
+        raise HTTPException(404, "큐카드 세트를 찾을 수 없어요")
+    return result
+
+
+class LecturePatch(BaseModel):
+    title: str | None = None
+    course: str | None = Field(None, description="과목 이름. 없으면 새로 만든다")
+    recordedAt: str | None = None
+
+
+@app.patch("/api/lectures/{lecture_id}")
+def update_lecture(lecture_id: str, body: LecturePatch):
+    """제목·과목·녹음 날짜 수정. 제목을 직접 바꾸면 요약 뒤 자동 제목이 더 이상 덮어쓰지 않는다."""
+    with SessionLocal.begin() as db:
+        lec = _get_lecture(db, lecture_id)
+        if body.title is not None:
+            if not body.title.strip():
+                raise HTTPException(400, "제목이 비어 있어요")
+            lec.title = body.title.strip()
+            lec.title_auto = False
+        if body.course is not None:
+            name = body.course.strip()
+            if not name:
+                raise HTTPException(400, "과목 이름이 비어 있어요")
+            course = db.scalars(select(Course).where(Course.name == name)).first()
+            if not course:
+                course = Course(name=name)
+                db.add(course)
+                db.flush()
+            lec.course_id = course.id
+        if body.recordedAt is not None:
+            try:
+                date.fromisoformat(body.recordedAt)
+            except ValueError:
+                raise HTTPException(400, "recordedAt은 YYYY-MM-DD 형식이어야 해요") from None
+            lec.recorded_at = body.recordedAt
+        db.flush()
+        return _lecture_out(db, lec)
+
+
 @app.delete("/api/lectures/{lecture_id}")
 def delete_lecture(lecture_id: str):
     with SessionLocal.begin() as db:
@@ -356,7 +506,8 @@ def list_concepts(lecture: str | None = None):
             query = query.where(Concept.lecture_id == lecture)
         rows = db.execute(query.order_by(Lecture.created_at.desc(), Concept.position)).all()
         courses = {c.id: c.name for c in db.scalars(select(Course)).all()}
-        return [_concept_out(c, lec, courses.get(lec.course_id, "")) for c, lec in rows]
+        links = _resources_of(db, [c.id for c, _ in rows])
+        return [_concept_out(c, lec, courses.get(lec.course_id, ""), links.get(c.id, [])) for c, lec in rows]
 
 
 # ---------- 퀴즈 ----------

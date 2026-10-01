@@ -6,7 +6,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, create_engine, inspect, text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from app import config
@@ -103,6 +103,24 @@ class Concept(Base):
     mastery: Mapped[str] = mapped_column(String(10), default="new")
 
 
+class ConceptResource(Base):
+    """개념별 공부 자료 링크. 퀴즈에서 틀렸을 때 보여준다 (app/resources.py).
+    주소는 위키백과 API·네이버 검색 결과에서만 나온다 (LLM이 주소를 만들지 않는다)."""
+
+    __tablename__ = "concept_resources"
+    __table_args__ = (UniqueConstraint("concept_id", "url"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    concept_id: Mapped[str] = mapped_column(String(32), ForeignKey("concepts.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # wikipedia | blog
+    source: Mapped[str] = mapped_column(String(100))  # wikipedia-ko, wikipedia-en, inpa.tistory.com …
+    title: Mapped[str] = mapped_column(String(300))
+    url: Mapped[str] = mapped_column(String(1000))
+    snippet: Mapped[str | None] = mapped_column(Text)  # 화면에 보여줄 한두 줄 요약
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Question(Base):
     """생성된 문제. 퀴즈를 만들 때마다 새로 생성하고, 틀린 문제는 가중치를 높여 다시 낸다."""
 
@@ -139,6 +157,55 @@ class Quiz(Base):
     question_ids: Mapped[list] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Card(Base):
+    """큐카드(플래시카드). 강의 처리 때 개념마다 1~3장 만들어 저장한다."""
+
+    __tablename__ = "cards"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("card"))
+    lecture_id: Mapped[str] = mapped_column(String(32), ForeignKey("lectures.id", ondelete="CASCADE"), index=True)
+    concept_id: Mapped[str] = mapped_column(String(32), ForeignKey("concepts.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    icon: Mapped[str] = mapped_column(String(16), default="📚")
+    front: Mapped[str] = mapped_column(Text)  # 질문
+    answer: Mapped[str] = mapped_column(String(300))  # 정답
+    explanation: Mapped[str] = mapped_column(Text)  # 강의 내용 기반 설명
+    # AI가 덧붙인 비유·예시. 강의에 없는 내용이라 화면에서 구분해 보여준다
+    example: Mapped[str | None] = mapped_column(Text)
+    evidence: Mapped[str | None] = mapped_column(Text)  # 근거가 된 전사본 문장
+    provider: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class CardProgress(Base):
+    """카드별 학습 상태 (라이트너 상자). 몰라요 → 1번 상자, 알아요 → 한 칸 위."""
+
+    __tablename__ = "card_progress"
+    __table_args__ = (UniqueConstraint("card_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    card_id: Mapped[str] = mapped_column(String(32), ForeignKey("cards.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(64), index=True)  # 로그인 붙이기 전까지는 비워둔다
+    box: Mapped[int] = mapped_column(Integer, default=1)  # 1~5
+    known_count: Mapped[int] = mapped_column(Integer, default=0)
+    unknown_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)  # 다음에 볼 때
+
+
+class CardSession(Base):
+    """큐카드 한 세트. 끝까지 봤는지(XP 지급용)와 나간 카드를 기록한다."""
+
+    __tablename__ = "card_sessions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("cs"))
+    lecture_id: Mapped[str] = mapped_column(String(32), ForeignKey("lectures.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    card_ids: Mapped[list] = mapped_column(JSON)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # MVP용 간단 마이그레이션: 기존 DB에 새 컬럼 추가 (출시 전에는 Alembic으로 바꾼다)
