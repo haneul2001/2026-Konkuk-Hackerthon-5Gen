@@ -24,6 +24,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
 from app import cards, config, resources, stt, vocab
+from app.evidence import find_evidence
 from app.audio import PRESETS, preprocess, probe_duration
 from app.db import Card, Concept, ConceptResource, Course, Lecture, Question, SessionLocal, init_db
 from app.quiz import service as quiz_service
@@ -53,11 +54,16 @@ async def lifespan(_: FastAPI):
 
 
 def _backfill_concepts(db: Session) -> None:
-    """개념 테이블이 생기기 전에 요약된 강의는 저장된 요약에서 개념 카드를 만든다."""
+    """개념 테이블이 생기기 전에 요약된 강의는 저장된 요약에서 개념 카드를 만들고,
+    근거 자막이 아직 없는 개념은 찾아 붙인다."""
     has_concepts = select(Concept.lecture_id).distinct()
     for lec in db.scalars(select(Lecture).where(Lecture.status == "done", Lecture.id.not_in(has_concepts))).all():
         for i, c in enumerate((lec.summary or {}).get("concepts", [])):
             db.add(Concept(lecture_id=lec.id, position=i, term=c["name"], summary=c["explanation"]))
+    db.flush()
+    for concept in db.scalars(select(Concept).where(Concept.evidence.is_(None))).all():
+        lec = db.get(Lecture, concept.lecture_id)
+        concept.evidence = find_evidence(concept.term, (lec.segments if lec else None) or [])
 
 
 app = FastAPI(title="학습도우미 AI 서버", lifespan=lifespan)
@@ -122,7 +128,15 @@ def _save_summary(lecture_id: str, result) -> None:
         lec = db.get(Lecture, lecture_id)
         _delete_concepts(db, lecture_id)
         for i, c in enumerate(result.summary["concepts"]):
-            db.add(Concept(lecture_id=lecture_id, position=i, term=c["name"], summary=c["explanation"]))
+            db.add(
+                Concept(
+                    lecture_id=lecture_id,
+                    position=i,
+                    term=c["name"],
+                    summary=c["explanation"],
+                    evidence=find_evidence(c["name"], lec.segments or []),
+                )
+            )
         if lec.title_auto and result.summary.get("title"):
             week = lec.title.split(" — ")[0]
             lec.title = f"{week} — {result.summary['title']}"
@@ -257,6 +271,8 @@ def _concept_out(c: Concept, lec: Lecture, course_name: str, links: list[dict]) 
         "lectureTitle": lec.title,
         "course": course_name,
         "mastery": c.mastery,
+        # 근거 자막 [{start, end, text}]: 눌러서 녹음의 그 부분을 듣는다. 빈 배열이면 녹음에서 같은 표현을 못 찾음
+        "evidence": c.evidence or [],
         "resources": links,  # 공부 자료 링크 (studyapp 타입에 없는 추가 필드)
     }
 

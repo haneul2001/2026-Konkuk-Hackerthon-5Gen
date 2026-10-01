@@ -3,6 +3,7 @@ import { Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import type { Concept, Lecture, TranscriptSegment } from '../../shared/types'
 import { api } from '../api/client'
 import { cn } from '../lib/cn'
+import { clock } from '../lib/time'
 import { Button, Card } from './ui'
 
 // 강의 듣기: AI 요약을 읽어주는 TTS와, 녹음 원본을 자막과 함께 다시 듣기.
@@ -196,16 +197,21 @@ export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concept
 
 // ---------- 녹음 다시 듣기 (원본 + 자막) ----------
 
-function clock(sec: number) {
-  const s = Math.floor(sec)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`
-}
-
-export function RecordingPlayer({ lectureId }: { lectureId: string }) {
+// startAt: 이 위치(초)부터 재생한다 (개념의 '근거 듣기'에서 넘어올 때)
+export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; startAt?: number }) {
   const audio = useRef<HTMLAudioElement>(null)
+
+  useEffect(() => {
+    const el = audio.current
+    if (!el || startAt == null) return
+    const go = () => {
+      el.currentTime = startAt
+      void el.play().catch(() => {}) // 자동 재생이 막히면 위치만 옮겨 둔다
+    }
+    if (el.readyState >= 1) go()
+    else el.addEventListener('loadedmetadata', go, { once: true })
+    return () => el.removeEventListener('loadedmetadata', go)
+  }, [startAt])
   const list = useRef<HTMLOListElement>(null)
   // undefined: 불러오는 중, null: 자막 없음
   const [segments, setSegments] = useState<TranscriptSegment[] | null | undefined>(undefined)

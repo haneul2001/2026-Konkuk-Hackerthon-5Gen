@@ -101,6 +101,8 @@ class Concept(Base):
     summary: Mapped[str] = mapped_column(Text)
     # new → learning → mastered (퀴즈 결과로 갱신)
     mastery: Mapped[str] = mapped_column(String(10), default="new")
+    # 근거 자막 [{start, end, text}] (app/evidence.py). None이면 아직 안 찾음, []이면 녹음에서 못 찾음
+    evidence: Mapped[list | None] = mapped_column(JSON)
 
 
 class ConceptResource(Base):
@@ -220,12 +222,13 @@ _LECTURE_COLUMNS = {
 
 
 _QUESTION_COLUMNS = {"aspect": "VARCHAR(20)"}
+_CONCEPT_COLUMNS = {"evidence": "JSON"}
 
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
     with engine.begin() as conn:
-        for table, wanted in (("lectures", _LECTURE_COLUMNS), ("questions", _QUESTION_COLUMNS)):
+        for table, wanted in (("lectures", _LECTURE_COLUMNS), ("questions", _QUESTION_COLUMNS), ("concepts", _CONCEPT_COLUMNS)):
             columns = {c["name"] for c in inspect(engine).get_columns(table)}
             for name, ddl in wanted.items():
                 if name not in columns:

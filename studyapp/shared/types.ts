@@ -150,6 +150,8 @@ export type Concept = {
   lectureTitle: string
   course: string
   mastery: 'new' | 'learning' | 'mastered' // 새 개념 | 익히는 중 | 외움 (퀴즈 결과로 갱신)
+  // 근거 자막 (AI 서버). 눌러서 녹음의 그 부분을 듣는다. 빈 배열이면 녹음에서 같은 표현을 못 찾음
+  evidence?: TranscriptSegment[]
 }
 
 // 녹음 다시 듣기 자막 한 줄. start·end는 녹음 시작부터의 초

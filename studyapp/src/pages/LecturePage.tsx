@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CircleAlert, Layers, Loader, Megaphone } from 'lucide-react'
+import { CircleAlert, Layers, Loader, Megaphone, Play } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
+import { clock } from '../lib/time'
 
 // 강의 상세: 요약 보기(TTS / 플래시카드)와 퀴즈 시작.
 // 업로드 직후엔 처리 중이라 몇 초마다 다시 불러와 단계·진행률을 보여준다.
@@ -25,6 +26,8 @@ export function LecturePage() {
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as Tab) || 'cards'
   const listen = params.get('listen') === 'recording' ? 'recording' : 'summary'
+  // 개념의 '근거 듣기'에서 넘어오면 녹음의 그 위치(초)
+  const startAt = params.has('t') ? Number(params.get('t')) : undefined
   // undefined: 불러오는 중, null: 없음
   const [lecture, setLecture] = useState<Lecture | null | undefined>(undefined)
   const [concepts, setConcepts] = useState<Concept[]>([])
@@ -136,7 +139,7 @@ export function LecturePage() {
               {listen === 'summary' ? (
                 <SummaryPlayer lecture={lecture} concepts={concepts} />
               ) : (
-                <RecordingPlayer lectureId={lecture.id} />
+                <RecordingPlayer lectureId={lecture.id} startAt={startAt} />
               )}
             </>
           )}
@@ -171,6 +174,10 @@ export function LecturePage() {
                     <p className="mt-1 text-[14px] leading-relaxed text-pretty text-muted">
                       {c.summary}
                     </p>
+                    <Evidence
+                      concept={c}
+                      onListen={(sec) => setParams({ tab: 'tts', listen: 'recording', t: String(Math.floor(sec)) })}
+                    />
                   </li>
                 ))}
               </ul>
@@ -200,6 +207,36 @@ export function LecturePage() {
           </Card>
         </>
       )}
+    </div>
+  )
+}
+
+// 개념의 근거: 녹음에서 그 개념을 말한 시간. 누르면 녹음 다시 듣기의 그 위치로 간다.
+// 못 찾았으면 AI가 정리하며 바꾼 말일 수 있다고 알려, 학생이 요약을 그대로 믿지 않게 한다.
+function Evidence({ concept, onListen }: { concept: Concept; onListen: (sec: number) => void }) {
+  if (!concept.evidence) return null
+  if (concept.evidence.length === 0) {
+    return (
+      <p className="mt-2 text-[13px] text-pretty text-muted">
+        녹음에서 같은 표현을 찾지 못했어요. AI가 정리하며 바꾼 말일 수 있어요.
+      </p>
+    )
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="text-[13px] font-semibold text-muted">근거 듣기</span>
+      {concept.evidence.map((e) => (
+        <button
+          key={e.start}
+          type="button"
+          title={e.text}
+          onClick={() => onListen(e.start)}
+          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md bg-primary-soft px-2 text-[13px] font-semibold text-primary-deep tabular-nums"
+        >
+          <Play className="size-3.5" aria-hidden />
+          {clock(e.start)}
+        </button>
+      ))}
     </div>
   )
 }
