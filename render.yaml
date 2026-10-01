@@ -16,3 +16,6 @@ services:
       # Cloudflare Tunnel로 연 AI 서버 주소. 예: https://xxxx.trycloudflare.com (끝에 / 없이)
       - key: AI_SERVER
         sync: false
+      # 시연용 더미 데이터(리그 상대·게시글·내 기록). 빼면 빈 상태로 시작
+      - key: DEMO_SEED
+        value: "1"
