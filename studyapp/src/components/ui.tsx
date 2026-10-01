@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/cn'
+import { courseTone } from '../lib/courseTone'
 
 // 반복해서 쓰는 작은 조각들. 블록형: 두꺼운 테두리 + 아래로만 떨어지는 단색 그림자.
 // 터치 대상은 최소 44px(h-11) 이상.
@@ -137,24 +138,14 @@ export function Tag({
   )
 }
 
-// 과목마다 고정 색. 색만으로 구분하지 않도록 첫 글자를 함께 쓴다.
-const courseTones = [
-  'bg-sky-100 text-sky-800',
-  'bg-amber-100 text-amber-800',
-  'bg-rose-100 text-rose-800',
-  'bg-lime-100 text-lime-800',
-  'bg-primary-soft text-primary-deep',
-]
-
+// 과목 배지: 과목 색(lib/courseTone) + 첫 글자
 export function CourseBadge({ course, className }: { course: string; className?: string }) {
-  let h = 0
-  for (const ch of course) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   return (
     <span
       aria-hidden
       className={cn(
         'flex size-11 shrink-0 items-center justify-center rounded-xl text-base font-bold',
-        courseTones[h % courseTones.length],
+        courseTone(course),
         className,
       )}
     >
