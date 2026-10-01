@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { Readable } from 'node:stream'
 import cors from 'cors'
 import express from 'express'
@@ -323,6 +325,17 @@ app.post('/api/posts/:id/join', (req, res) => {
   if ('error' in post) return res.status(400).json(post)
   res.json(post)
 })
+
+// ---- 배포 ----
+// 빌드한 화면(dist/)이 있으면 같이 내보낸다. 새로고침해도 화면이 뜨게 /api 밖은 index.html로.
+const DIST = path.resolve(import.meta.dirname, '../dist')
+if (existsSync(DIST)) {
+  app.use(express.static(DIST))
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api')) return next()
+    res.sendFile(path.join(DIST, 'index.html'))
+  })
+}
 
 const PORT = Number(process.env.PORT) || 3001
 app.listen(PORT, () => {
