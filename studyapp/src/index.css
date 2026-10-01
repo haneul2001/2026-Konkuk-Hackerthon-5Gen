@@ -96,7 +96,7 @@ body {
   to { transform: translateY(0); }
 }
 
-/* 큐카드: 답한 카드는 위로 빠지고 다음 카드가 아래서 올라온다 */
+/* 플래시카드: 답한 카드는 위로 빠지고 다음 카드가 아래서 올라온다 */
 @keyframes card-out {
   to { transform: translateY(-120%) scale(0.9); opacity: 0; }
 }

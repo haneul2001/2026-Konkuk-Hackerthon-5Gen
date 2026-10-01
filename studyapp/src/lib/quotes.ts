@@ -1,5 +1,5 @@
-// 큐카드 위쪽 그림에 쓰는 공부 명언. 그림은 public/cuecards/quote-01.webp ~ quote-10.webp.
-// 글자는 그림에 넣지 않고 화면에서 얹는다(생성 이미지의 한글이 자주 깨져서).
+// 플래시카드를 다 넘긴 뒤 결과 화면에 띄우는 공부 명언.
+// 사진은 public/flashcards/quote-01.webp ~ quote-10.webp (800×450, CC0. 출처는 같은 폴더 CREDITS.md).
 
 export type Quote = { text: string; author: string; image: string }
 
@@ -19,11 +19,11 @@ const LINES: [string, string][] = [
 export const QUOTES: Quote[] = LINES.map(([text, author], i) => ({
   text,
   author,
-  image: `/cuecards/quote-${String(i + 1).padStart(2, '0')}.webp`,
+  image: `/flashcards/quote-${String(i + 1).padStart(2, '0')}.webp`,
 }))
 
-// 덱마다 시작점만 무작위로 잡고 순서대로 돌린다. 연달아 같은 그림이 나오지 않는다.
-export function quoteCycle(count: number): Quote[] {
-  const start = Math.floor(Math.random() * QUOTES.length)
-  return Array.from({ length: count }, (_, i) => QUOTES[(start + i) % QUOTES.length])
+// 직전과 다른 명언 하나를 무작위로 고른다.
+export function randomQuote(except?: Quote): Quote {
+  const pool = QUOTES.filter((q) => q !== except)
+  return pool[Math.floor(Math.random() * pool.length)]
 }

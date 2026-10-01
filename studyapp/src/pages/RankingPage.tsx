@@ -7,7 +7,7 @@ import { cn } from '../lib/cn'
 
 const xpWays = [
   { icon: ListChecks, label: '객관식·O/X 정답', when: '맞힌 문제마다' },
-  { icon: Layers, label: '큐카드 학습', when: '한 세트 끝까지' },
+  { icon: Layers, label: '플래시카드 학습', when: '한 세트 끝까지' },
   { icon: Headphones, label: 'TTS 듣기', when: '5분마다' },
   { icon: Flame, label: '연속 학습일', when: '스트릭 보너스' },
   { icon: RotateCcw, label: '복습 완료', when: '알림 받은 날 끝내면' },

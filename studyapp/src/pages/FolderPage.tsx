@@ -114,9 +114,9 @@ export function FolderPage() {
             <ButtonLink to={`/quiz?folder=${folder.id}`} variant="primary" className="w-full">
               이 폴더로 문제 풀기
             </ButtonLink>
-            <ButtonLink to={`/cards?folder=${folder.id}`} className="w-full">
+            <ButtonLink to={`/flashcards?folder=${folder.id}`} className="w-full">
               <Layers className="size-5" aria-hidden />
-              큐카드로 외우기
+              플래시카드로 외우기
             </ButtonLink>
           </>
         ) : null}

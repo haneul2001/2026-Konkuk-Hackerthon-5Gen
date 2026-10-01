@@ -40,7 +40,7 @@ export function HomePage() {
     api.todayReviews().then(setReviews)
     api.lectures().then(setLectures)
     api.league().then(setLeague)
-    api.posts().then(setPosts)
+    api.posts('study').then(setPosts)
   }, [])
 
   const questionTotal = reviews?.reduce((n, r) => n + r.questionCount, 0) ?? 0
@@ -175,6 +175,8 @@ export function HomePage() {
                     trailing={
                       l.status === 'processing' ? (
                         <Tag tone="accent">요약 중</Tag>
+                      ) : l.status === 'failed' ? (
+                        <Tag tone="danger">처리 실패</Tag>
                       ) : (
                         <span className="shrink-0 text-[13px] tabular-nums text-muted">
                           카드 {l.cardCount}
@@ -229,24 +231,25 @@ export function HomePage() {
       </Section>
 
       {/* 스터디 모집 */}
-      <Section title="스터디 모집" action={{ label: '더 보기', to: '/board' }}>
+      <Section title="스터디 모집" action={{ label: '더 보기', to: '/board?board=study' }}>
         {posts === null || me === null ? (
           <ListSkeleton rows={2} />
         ) : (
           <Card>
             <ul className="divide-y-2 divide-line">
               {posts.slice(0, 3).map((p) => {
-                const eligible = me.xpTotal >= p.minXp
-                const full = p.joined >= p.capacity
+                const s = p.study!
+                const eligible = me.xpTotal >= s.minXp
+                const full = s.joined >= s.capacity
                 return (
                   <li key={p.id}>
                     <Row
                       to={`/board?post=${p.id}`}
-                      leading={<CourseBadge course={p.course} />}
+                      leading={<CourseBadge course={s.course} />}
                       title={p.title}
                       meta={
                         <span className="tabular-nums">
-                          {p.joined}/{p.capacity}명 · XP {p.minXp.toLocaleString()} 이상
+                          {s.joined}/{s.capacity}명 · XP {s.minXp.toLocaleString()} 이상
                         </span>
                       }
                       trailing={

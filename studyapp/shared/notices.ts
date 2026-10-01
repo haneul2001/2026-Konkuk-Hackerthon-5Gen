@@ -83,7 +83,8 @@ export function noticesAfterSubmit(before: { solved: number; xpTotal: number }):
     })
   }
   for (const p of posts) {
-    if (p.joined < p.capacity && before.xpTotal < p.minXp && me.xpTotal >= p.minXp) {
+    const s = p.study
+    if (s && s.joined < s.capacity && before.xpTotal < s.minXp && me.xpTotal >= s.minXp) {
       out.push({
         id: `study_${p.id}`,
         kind: 'study',
@@ -99,7 +100,7 @@ export function noticesAfterSubmit(before: { solved: number; xpTotal: number }):
 // 관리자 화면의 "알림 시험 발송"용 예시. 실제 상태와 상관없이 모양만 확인한다.
 export function sampleNotice(kind: Notice['kind']): Notice {
   const lecture = lectures.find((l) => l.status === 'ready')
-  const post = posts[0]
+  const post = posts.find((p) => p.study) ?? posts[0]
   const id = `sample_${kind}_${Date.now()}`
   switch (kind) {
     case 'angry':

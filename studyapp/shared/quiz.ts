@@ -130,9 +130,28 @@ export function gradeEssay(q: EssayQuestion, text: string) {
   }
 }
 
-export function submitQuiz(sub: QuizSubmission): QuizSubmitResult {
+// AI 서버가 채점 결과에 붙여 주는 문제 → 강의·개념 연결
+export type GradedResult = {
+  questionId: string
+  lectureId: string
+  conceptId: string
+  correct: boolean | null
+}
+
+type LectureInfo = Map<string, { title: string; course: string }>
+
+// fromAi가 있으면 AI 서버가 만든 문제다: 강의는 거기서 찾고, 개념 숙련도는 AI 서버가 이미 갱신했다.
+// 없으면 목 문제 은행(quizBank)의 문제로 보고 여기서 다 처리한다.
+export function submitQuiz(
+  sub: QuizSubmission,
+  fromAi?: GradedResult[],
+  lectureInfo?: LectureInfo,
+): QuizSubmitResult {
+  const lectureOfQuestion = fromAi
+    ? new Map(fromAi.map((g) => [g.questionId, g.lectureId] as const))
+    : lectureOf
   const graded = sub.results.filter(
-    (r) => r.correct !== null && lectureOf.has(r.questionId),
+    (r) => r.correct !== null && lectureOfQuestion.has(r.questionId),
   )
   const correctCount = graded.filter((r) => r.correct).length
   const xpGained = correctCount * XP_PER_CORRECT
@@ -167,18 +186,18 @@ export function submitQuiz(sub: QuizSubmission): QuizSubmitResult {
   // 오답 기록은 강의 단위. 폴더 퀴즈는 여러 강의에 걸칠 수 있어서 문제마다 강의를 찾아 나눈다.
   const touched = new Set<string>()
   for (const r of graded) {
-    const lectureId = lectureOf.get(r.questionId)!
+    const lectureId = lectureOfQuestion.get(r.questionId)!
     const wrong = wrongByLecture.get(lectureId) ?? new Set<string>()
     if (r.correct) wrong.delete(r.questionId)
     else wrong.add(r.questionId)
     wrongByLecture.set(lectureId, wrong)
     touched.add(lectureId)
   }
-  for (const lectureId of touched) syncWrongReview(lectureId)
+  for (const lectureId of touched) syncWrongReview(lectureId, lectureInfo?.get(lectureId))
 
-  // 개념 숙련도: 이번에 하나라도 틀리면 익히는 중, 다 맞으면 한 단계 올린다.
+  // 개념 숙련도: 이번에 하나라도 틀리면 익히는 중, 다 맞으면 한 단계 올린다. (AI 서버 문제는 서버가 갱신)
   const byConcept = new Map<string, boolean>()
-  for (const r of graded) {
+  for (const r of fromAi ? [] : graded) {
     const q = allQuestions.find((x) => x.id === r.questionId)
     if (!q) continue
     byConcept.set(q.conceptId, (byConcept.get(q.conceptId) ?? true) && !!r.correct)
@@ -199,7 +218,7 @@ export function submitQuiz(sub: QuizSubmission): QuizSubmitResult {
 }
 
 // "틀린 문제 다시 풀기" 복습 항목을 남은 오답 수에 맞춘다.
-function syncWrongReview(lectureId: string) {
+function syncWrongReview(lectureId: string, info?: { title: string; course: string }) {
   const wrong = wrongByLecture.get(lectureId) ?? new Set()
   const i = todayReviews.findIndex((r) => r.lectureId === lectureId && r.reason === 'wrong')
   if (wrong.size === 0) {
@@ -210,7 +229,7 @@ function syncWrongReview(lectureId: string) {
     todayReviews[i].questionCount = wrong.size
     return
   }
-  const lecture = lectures.find((l) => l.id === lectureId)
+  const lecture = info ?? lectures.find((l) => l.id === lectureId)
   todayReviews.unshift({
     id: `rev_wrong_${lectureId}`,
     lectureId,

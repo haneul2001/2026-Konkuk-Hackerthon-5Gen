@@ -6,12 +6,12 @@ import { LIBRARY_NAME } from '../lib/names'
 import { Flashcards } from '../components/Flashcards'
 import { ButtonLink, Card, ListSkeleton, PageTitle } from '../components/ui'
 
-// 큐카드 보기. 어떤 개념 묶음을 넘길지는 주소로 정한다.
-//  /cards?folder=ID    내가 만든 폴더의 개념
-//  /cards?lecture=ID   강의 하나의 개념
-//  /cards?course=과목  서재의 과목 필터 (없으면 전체 개념)
+// 플래시카드 보기. 어떤 개념 묶음을 넘길지는 주소로 정한다.
+//  /flashcards?folder=ID    내가 만든 폴더의 개념
+//  /flashcards?lecture=ID   강의 하나의 개념
+//  /flashcards?course=과목  서재의 과목 필터 (없으면 전체 개념)
 
-export function CardsPage() {
+export function FlashcardsPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const folderId = params.get('folder')
@@ -31,7 +31,7 @@ export function CardsPage() {
   if (concepts === null || folders === null || lectures === null) {
     return (
       <div className="space-y-6">
-        <PageTitle title="큐카드" />
+        <PageTitle title="플래시카드" />
         <ListSkeleton rows={2} />
       </div>
     )
@@ -56,7 +56,7 @@ export function CardsPage() {
   if (picked.length === 0) {
     return (
       <div className="space-y-6">
-        <PageTitle title="큐카드" sub={title} />
+        <PageTitle title="플래시카드" sub={title} />
         <Card className="px-5 py-8 text-center">
           <p className="text-[15px] text-muted">넘겨 볼 개념이 아직 없어요.</p>
           <ButtonLink to="/library?tab=concepts" variant="primary" className="mt-4">

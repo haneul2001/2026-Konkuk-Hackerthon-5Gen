@@ -119,7 +119,7 @@ export function Tag({
   tone = 'neutral',
 }: {
   children: ReactNode
-  tone?: 'neutral' | 'primary' | 'accent' | 'success'
+  tone?: 'neutral' | 'primary' | 'accent' | 'success' | 'danger'
 }) {
   return (
     <span
@@ -129,6 +129,7 @@ export function Tag({
         tone === 'primary' && 'bg-primary-soft text-primary-deep',
         tone === 'accent' && 'bg-accent-soft text-accent-ink',
         tone === 'success' && 'bg-success-soft text-success',
+        tone === 'danger' && 'bg-danger-soft text-danger',
       )}
     >
       {children}

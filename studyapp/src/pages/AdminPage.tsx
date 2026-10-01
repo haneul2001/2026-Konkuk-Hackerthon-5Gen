@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Minus, Plus, Send } from 'lucide-react'
-import type { Mood, Notice, UserSummary } from '../../shared/types'
+import { Link } from 'react-router-dom'
+import { Minus, Plus, RefreshCw, Send } from 'lucide-react'
+import type { Mood, Notice, Report, UserSummary } from '../../shared/types'
 import { presetFor, type StudyRecordInput } from '../../shared/admin'
 import { currentStreak, daysSinceStudy, MOODS, moodInfo, moodOf, solvedToday } from '../../shared/mood'
 import { absenceNotice, sampleNotice } from '../../shared/notices'
@@ -9,6 +10,7 @@ import { Mascot } from '../components/Mascot'
 import { Button, Card, ListSkeleton, PageTitle, Section, Segmented, Tag } from '../components/ui'
 import { cn } from '../lib/cn'
 import { useNotify } from '../lib/notify'
+import { timeAgo } from '../lib/time'
 
 // 관리자(개발용). 학습 기록을 바꿔서 마스코트 기분이 제대로 바뀌는지, 알림 배너가 어떻게 보이는지 확인한다.
 // TODO: 출시 전에 관리자 인증을 붙이거나 화면을 뺀다.
@@ -181,7 +183,68 @@ export function AdminPage() {
           앱을 열 때 이 규칙으로 알림을 만들어 배너로 띄워요. 여러 개면 하나씩 차례로 보여요.
         </p>
       </Section>
+
+      <Reports />
     </div>
+  )
+}
+
+// 게시판 글·댓글 신고 내역. 화면에 들어올 때와 '새로고침'을 누를 때 불러온다.
+function Reports() {
+  const [reports, setReports] = useState<Report[] | null>(null)
+  const load = () => api.reports().then(setReports)
+  useEffect(() => {
+    load()
+  }, [])
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[17px] font-bold">
+          신고 내역 {reports && reports.length > 0 && <span className="text-danger tabular-nums">{reports.length}</span>}
+        </h2>
+        <button
+          type="button"
+          onClick={load}
+          className="-mr-2 inline-flex h-11 cursor-pointer items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <RefreshCw className="size-4" aria-hidden />
+          새로고침
+        </button>
+      </div>
+      {reports === null ? (
+        <ListSkeleton rows={1} />
+      ) : reports.length === 0 ? (
+        <p className="rounded-2xl border-2 border-line bg-surface px-4 py-6 text-center text-[14px] text-muted">
+          들어온 신고가 없어요. 게시판 글이나 댓글의 ⋮ → 신고로 넣어 볼 수 있어요.
+        </p>
+      ) : (
+        <Card>
+          <ul className="divide-y-2 divide-line">
+            {reports.map((r) => (
+              <li key={r.id} className="space-y-1.5 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5">
+                    <Tag>{r.kind === 'post' ? '게시글' : '댓글'}</Tag>
+                    <Tag tone="danger">{r.reason}</Tag>
+                  </span>
+                  <span className="text-[12px] text-muted">{timeAgo(r.createdAt)}</span>
+                </div>
+                <p className="line-clamp-3 text-[15px] leading-snug">
+                  <b>{r.author}</b> {r.body}
+                </p>
+                <Link
+                  to={`/board?post=${r.postId}`}
+                  className="block truncate text-[13px] font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  글: {r.postTitle}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </section>
   )
 }
 

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, RotateCcw, X } from 'lucide-react'
 import type { Concept } from '../../shared/types'
-import { quoteCycle, type Quote } from '../lib/quotes'
+import { randomQuote, type Quote } from '../lib/quotes'
 import { useImmersive } from '../lib/immersive'
 import { cn } from '../lib/cn'
 import { Button, ButtonLink, CourseBadge, Sheet } from './ui'
 
-// 큐카드(플래시카드). 한 장씩: 앞면(설명) 탭 → 뒤집혀 개념 이름 → 몰라요/알아요 → 다음 장.
-// 앞면 위 1/3은 공부 명언 그림. 글이 길면 카드 면 안에서 스크롤한다.
+// 플래시카드. 한 장씩: 앞면(설명) 탭 → 뒤집혀 개념 이름 → 몰라요/알아요 → 다음 장.
+// 글이 길면 카드 면 안에서 스크롤한다. 공부 명언은 다 넘긴 뒤 결과 화면에서만 나온다.
 
 const SWAP_MS = 300
 
@@ -26,7 +26,7 @@ export function Flashcards({
   // 덱 순서는 시작할 때마다 섞는다. "몰라요만 다시"는 그 카드들로 새 덱을 만든다.
   const [deck, setDeck] = useState(() => shuffle(concepts))
   const [round, setRound] = useState(0)
-  const [quotes, setQuotes] = useState(() => quoteCycle(concepts.length))
+  const [quote, setQuote] = useState(() => randomQuote())
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [phase, setPhase] = useState<'idle' | 'out' | 'in'>('idle')
@@ -55,7 +55,7 @@ export function Flashcards({
 
   function restart(next: Concept[]) {
     setDeck(shuffle(next))
-    setQuotes(quoteCycle(next.length))
+    setQuote((q) => randomQuote(q))
     setRound((r) => r + 1)
     setIndex(0)
     setFlipped(false)
@@ -113,6 +113,7 @@ export function Flashcards({
 
       {done ? (
         <Finished
+          quote={quote}
           total={total}
           unknown={unknown}
           quizTo={quizTo}
@@ -133,7 +134,6 @@ export function Flashcards({
             >
               <FlipCard
                 concept={card}
-                quote={quotes[index]}
                 flipped={flipped}
                 onFlip={() => phase === 'idle' && setFlipped((f) => !f)}
               />
@@ -170,12 +170,10 @@ export function Flashcards({
 
 function FlipCard({
   concept,
-  quote,
   flipped,
   onFlip,
 }: {
   concept: Concept
-  quote: Quote
   flipped: boolean
   onFlip: () => void
 }) {
@@ -193,25 +191,24 @@ function FlipCard({
         flipped && 'rotate-y-180',
       )}
     >
-      {/* 앞면: 명언 그림 1/3 + 설명(문제) */}
+      {/* 앞면: 설명(문제) */}
       <section
         aria-hidden={flipped}
-        className="absolute inset-0 grid grid-rows-[1fr_2fr] overflow-hidden rounded-3xl border-2 border-line bg-surface shadow-[0_4px_0_var(--color-line)] backface-hidden"
+        className="absolute inset-0 flex flex-col overflow-hidden rounded-3xl border-2 border-line bg-surface px-6 pt-5 pb-4 shadow-[0_4px_0_var(--color-line)] backface-hidden"
       >
-        <QuoteArt quote={quote} />
-        <div className="flex min-h-0 flex-col px-5 pt-4 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-primary-soft px-3 py-1 text-[13px] font-bold text-primary">
-              Q. 이 설명에 맞는 개념은?
-            </span>
-            <CourseBadge course={concept.course} className="ml-auto size-7" />
-          </div>
-          {/* 글이 길면 이 안에서만 스크롤 */}
-          <div className="no-scrollbar mt-3 min-h-0 flex-1 overflow-y-auto">
-            <p className="text-[18px] leading-relaxed font-semibold text-pretty">{concept.summary}</p>
-          </div>
-          <p className="pt-2 text-center text-[13px] text-muted">카드를 눌러 정답 보기</p>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-primary-soft px-3 py-1 text-[13px] font-bold text-primary">
+            Q. 이 설명에 맞는 개념은?
+          </span>
+          <CourseBadge course={concept.course} className="ml-auto size-7" />
         </div>
+        {/* 짧으면 가운데, 길면 이 안에서만 스크롤 */}
+        <div className="no-scrollbar my-4 flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <p className="my-auto text-center text-[20px] leading-relaxed font-semibold text-pretty">
+            {concept.summary}
+          </p>
+        </div>
+        <p className="text-center text-[13px] text-muted">카드를 눌러 정답 보기</p>
       </section>
 
       {/* 뒷면: 개념 이름 */}
@@ -231,27 +228,33 @@ function FlipCard({
   )
 }
 
-function QuoteArt({ quote }: { quote: Quote }) {
+// 결과 화면의 명언 카드: 16:9 사진 + 아래에 문구
+function QuoteCard({ quote }: { quote: Quote }) {
   const [failed, setFailed] = useState(false)
   return (
-    <figure className="relative min-h-0 overflow-hidden bg-primary">
-      {!failed && (
-        <img
-          src={quote.image}
-          alt=""
-          className="absolute inset-0 size-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      )}
-      <figcaption className="absolute inset-x-0 bottom-0 bg-ink/60 px-4 py-2.5 text-white">
-        <p className="text-[15px] leading-snug font-bold text-balance">“{quote.text}”</p>
-        <p className="mt-0.5 text-[12px] font-semibold text-white/80">— {quote.author}</p>
+    <figure className="overflow-hidden rounded-2xl border-2 border-line bg-surface shadow-[0_3px_0_var(--color-line)]">
+      <div className="aspect-video bg-primary">
+        {!failed && (
+          <img
+            src={quote.image}
+            alt=""
+            width={800}
+            height={450}
+            className="size-full object-cover"
+            onError={() => setFailed(true)}
+          />
+        )}
+      </div>
+      <figcaption className="px-4 py-3.5 text-left">
+        <p className="text-[16px] leading-snug font-bold text-balance">“{quote.text}”</p>
+        <p className="mt-1 text-[13px] font-semibold text-muted">— {quote.author}</p>
       </figcaption>
     </figure>
   )
 }
 
 function Finished({
+  quote,
   total,
   unknown,
   quizTo,
@@ -259,6 +262,7 @@ function Finished({
   onRestart,
   onQuit,
 }: {
+  quote: Quote
   total: number
   unknown: Concept[]
   quizTo: string | null
@@ -268,23 +272,16 @@ function Finished({
 }) {
   const known = total - unknown.length
   return (
-    <div className="flex flex-1 animate-[card-in_300ms_ease-out] flex-col justify-center gap-6 py-6 text-center">
+    <div className="flex flex-1 animate-[card-in_300ms_ease-out] flex-col gap-5 py-4 text-center">
       <div>
-        <p className="text-[24px] font-bold">카드 {total}장을 다 봤어요</p>
-        <p className="mt-2 text-[15px] text-muted">
-          {unknown.length === 0 ? '전부 알고 있어요. 문제로 확인해 볼까요?' : '헷갈린 카드만 한 번 더 보면 좋아요.'}
+        <p className="text-[22px] font-bold">카드 {total}장을 다 봤어요</p>
+        <p className="mt-1.5 text-[15px] text-muted">
+          알아요 <b className="text-success tabular-nums">{known}</b> · 몰라요{' '}
+          <b className="text-accent-ink tabular-nums">{unknown.length}</b>
+          {unknown.length === 0 ? ' · 문제로 확인해 볼까요?' : ' · 헷갈린 카드만 한 번 더!'}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border-2 border-line bg-surface py-4">
-          <p className="text-[13px] font-semibold text-muted">알아요</p>
-          <p className="mt-1 text-[26px] font-extrabold text-success tabular-nums">{known}</p>
-        </div>
-        <div className="rounded-2xl border-2 border-line bg-surface py-4">
-          <p className="text-[13px] font-semibold text-muted">몰라요</p>
-          <p className="mt-1 text-[26px] font-extrabold text-accent-ink tabular-nums">{unknown.length}</p>
-        </div>
-      </div>
+      <QuoteCard quote={quote} />
       <div className="space-y-2.5">
         {unknown.length > 0 && (
           <Button variant="primary" className="w-full" onClick={onRetryUnknown}>

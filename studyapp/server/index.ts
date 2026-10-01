@@ -1,42 +1,86 @@
+import { Readable } from 'node:stream'
 import cors from 'cors'
 import express from 'express'
 import { setStudyRecord } from '../shared/admin'
+import {
+  addComment,
+  blockCommentAuthor,
+  blockPostAuthor,
+  createPost,
+  deletePost,
+  getPost,
+  joinPost,
+  listPosts,
+  listReports,
+  reportComment,
+  reportPost,
+  toggleCommentLike,
+  toggleLike,
+  updatePost,
+} from '../shared/board'
 import { createFolder, deleteFolder, updateFolder } from '../shared/folders'
 import { currentNotices } from '../shared/notices'
-import { concepts, folders, league, lectures, me, posts, todayReviews } from '../shared/mock'
-import { buildQuiz, buildReviewQuiz, submitQuiz } from '../shared/quiz'
+import { folders, league, me, todayReviews } from '../shared/mock'
+import { submitQuiz, type GradedResult } from '../shared/quiz'
 
-// 백엔드 스텁. 지금은 목 데이터를 돌려주고, 기능이 완성되면 라우트별로 구현을 채운다.
+// 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
+// XP·리그·연속 학습일·오늘 복습·폴더·게시판은 여기서 목 데이터로 처리한다.
+// 연결 방식은 ai-server/INTEGRATION.md 참고.
 // 실행: npm run server  (포트 3001)
+
+const AI = process.env.AI_SERVER ?? 'http://localhost:8000'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
+// 요청을 AI 서버로 그대로 넘긴다. multipart 업로드와 오디오 스트리밍도 된다.
+// body를 주면 그걸 JSON으로 보낸다(폴더·복습 정보를 붙일 때).
+// express.json()은 JSON만 파싱하므로 multipart 업로드 본문은 손대지 않고 스트림으로 넘어간다.
+async function forward(req: express.Request, res: express.Response, body?: unknown) {
+  try {
+    const isJson = body !== undefined || !!req.is('application/json')
+    const init: RequestInit & { duplex: 'half' } = {
+      method: req.method,
+      headers: isJson
+        ? { 'Content-Type': 'application/json' }
+        : { 'Content-Type': req.headers['content-type'] ?? '' },
+      body:
+        req.method === 'GET'
+          ? undefined
+          : isJson
+            ? JSON.stringify(body ?? req.body)
+            : (Readable.toWeb(req) as ReadableStream),
+      duplex: 'half', // Node fetch에서 스트림 본문을 보낼 때 필요
+    }
+    const r = await fetch(AI + req.originalUrl, init)
+    res.status(r.status)
+    r.headers.forEach((v, k) => {
+      if (k !== 'content-encoding' && k !== 'transfer-encoding') res.setHeader(k, v)
+    })
+    if (r.body) Readable.fromWeb(r.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res)
+    else res.end()
+  } catch {
+    if (!res.headersSent) res.status(503).json({ error: 'AI 서버에 연결할 수 없어요' })
+  }
+}
+
 // ---- 홈 ----
 app.get('/api/me', (_req, res) => res.json(me))
 app.get('/api/reviews/today', (_req, res) => res.json(todayReviews))
-app.get('/api/lectures', (_req, res) => res.json(lectures))
 app.get('/api/league', (_req, res) => res.json(league))
-app.get('/api/posts', (_req, res) => res.json(posts))
 
-// ---- 녹음·요약 (팀원 담당) ----
-// 오디오 업로드 → STT → 요약 → 큐카드 생성. 인터페이스만 정의.
-app.post('/api/lectures', (_req, res) => {
-  res.status(501).json({ error: 'not implemented', todo: '녹음 업로드 및 요약 파이프라인' })
-})
-app.get('/api/lectures/:id', (req, res) => {
-  const lecture = lectures.find((l) => l.id === req.params.id)
-  if (!lecture) return res.status(404).json({ error: 'not found' })
-  res.json(lecture)
-})
+// ---- 녹음·요약·개념 (AI 서버) ----
+// 업로드(multipart: audio, course, title?, recordedAt?) → 전처리 → STT → 요약 → 개념.
+// 2시간 녹음 기준 2~3분. 그동안 GET /api/lectures/:id 의 status·stage·progress로 진행을 본다.
+app.post('/api/lectures', (req, res) => forward(req, res))
+app.get('/api/lectures', (req, res) => forward(req, res))
+app.get('/api/lectures/:id', (req, res) => forward(req, res))
+app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
+// 서재의 개념 카드. ?lecture=ID 로 강의별 필터.
+app.get('/api/concepts', (req, res) => forward(req, res))
 
 // ---- 서재 ----
-// 녹음 원본은 /api/lectures, 개념 카드는 여기. ?lecture=ID 로 강의별 필터.
-app.get('/api/concepts', (req, res) => {
-  const { lecture } = req.query
-  res.json(lecture ? concepts.filter((c) => c.lectureId === lecture) : concepts)
-})
 // 개념 폴더: 사용자가 만들고 개념을 담는다. 폴더 단위로 퀴즈가 나온다.
 app.get('/api/folders', (_req, res) => res.json(folders))
 app.post('/api/folders', (req, res) => {
@@ -52,27 +96,56 @@ app.patch('/api/folders/:id', (req, res) => {
 app.delete('/api/folders/:id', (req, res) => {
   res.json(deleteFolder(req.params.id))
 })
-app.get('/api/lectures/:id/audio-file', (_req, res) => {
-  res.status(501).json({ error: 'not implemented', todo: '녹음 원본 파일 저장소(스토리지) 연결' })
-})
 
 // ---- 퀴즈·복습 ----
-// 지금은 shared/quizBank.ts의 목 문제에서 뽑는다. TODO: 요약 기반 문제 생성으로 교체
+// 문제는 AI 서버가 누를 때마다 새로 만든다(15~45초). 폴더는 AI 서버가 모르므로 여기서 풀어서 넘긴다.
 app.post('/api/quiz', (req, res) => {
   // body: { source: { kind: 'lecture' | 'folder', id }, type, count }
-  // 그 강의·폴더에 담긴 개념의 문제만 나온다.
-  const { source, type, count } = req.body ?? {}
-  if (!['lecture', 'folder'].includes(source?.kind)) return res.status(400).json({ error: 'source' })
-  if (!['multiple', 'ox', 'essay'].includes(type)) return res.status(400).json({ error: 'type' })
-  res.json(buildQuiz(source, type, Math.max(1, Math.min(20, Number(count) || 10))))
+  const { source } = req.body ?? {}
+  if (source?.kind === 'folder') {
+    const folder = folders.find((f) => f.id === source.id)
+    if (!folder) return res.status(404).json({ error: '폴더를 찾을 수 없어요' })
+    return forward(req, res, {
+      ...req.body,
+      source: { ...source, title: folder.name },
+      conceptIds: folder.conceptIds,
+    })
+  }
+  forward(req, res)
 })
+// 오늘 복습 목록은 여기서 관리하고, 문제는 AI 서버에 저장된 것에서 낸다.
 app.post('/api/reviews/:id/quiz', (req, res) => {
-  res.json(buildReviewQuiz(req.params.id))
+  const review = todayReviews.find((r) => r.id === req.params.id)
+  if (!review) return res.json(null)
+  forward(req, res, { lectureId: review.lectureId, reason: review.reason, count: review.questionCount })
 })
-app.post('/api/quiz/:id/submit', (req, res) => {
-  // body: QuizSubmission → XP 지급, 오답 기록, 오늘 복습·개념 숙련도 갱신
-  res.json(submitQuiz({ ...req.body, quizId: req.params.id }))
+// 채점 결과는 AI 서버에 먼저 넘겨 출제 가중치·개념 숙련도를 갱신하고,
+// 응답의 graded(문제 → 강의·개념)로 여기서 XP·오답 복습을 처리한다.
+app.post('/api/quiz/:id/submit', async (req, res) => {
+  try {
+    const r = await fetch(`${AI}/api/quiz/${req.params.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: req.body?.results ?? [] }),
+    })
+    if (!r.ok) return res.status(r.status).json(await r.json())
+    const { graded } = (await r.json()) as { graded: GradedResult[] }
+    res.json(submitQuiz({ ...req.body, quizId: req.params.id }, graded, await lectureInfo()))
+  } catch {
+    res.status(503).json({ error: 'AI 서버에 연결할 수 없어요' })
+  }
 })
+
+// 오답 복습 항목에 띄울 강의 제목·과목. 강의는 AI 서버에만 있다.
+async function lectureInfo() {
+  try {
+    const r = await fetch(`${AI}/api/lectures`)
+    const list = (await r.json()) as { id: string; title: string; course: string }[]
+    return new Map(list.map((l) => [l.id, { title: l.title, course: l.course }]))
+  } catch {
+    return undefined
+  }
+}
 
 // ---- XP·랭킹 ----
 app.post('/api/xp', (_req, res) => {
@@ -86,22 +159,94 @@ app.get('/api/notifications', (_req, res) => res.json(currentNotices()))
 
 // ---- 관리자(개발용) ----
 // 학습 기록을 바꿔서 마스코트 기분·알림을 확인한다. TODO: 출시 전 인증 붙이거나 제거
+app.get('/api/admin/reports', (_req, res) => res.json(listReports()))
 app.patch('/api/admin/study-record', (req, res) => {
   // body: { daysAgo, todaySolved, dailyGoal? }
   res.json(setStudyRecord(req.body ?? { daysAgo: 1, todaySolved: 0 }))
 })
 
 // ---- 게시판 ----
-app.post('/api/posts', (_req, res) => {
-  // body: { title, course, minXp, capacity, contact }
-  res.status(501).json({ error: 'not implemented', todo: '모집글 작성' })
+// 자유·질문·그룹 스터디 모집. ?board=free|question|study 로 게시판별.
+app.get('/api/posts', (req, res) => {
+  const board = ['free', 'question', 'study'].includes(String(req.query.board)) ? req.query.board : undefined
+  res.json(listPosts(board as 'free' | 'question' | 'study' | undefined, String(req.query.q ?? '')))
 })
-app.post('/api/posts/:id/join', (_req, res) => {
-  // 누적 XP가 minXp 이상인지 확인 후 연락처 공개
-  res.status(501).json({ error: 'not implemented', todo: 'XP 조건 확인 후 참여' })
+app.get('/api/posts/:id', (req, res) => {
+  const found = getPost(req.params.id)
+  if (!found) return res.status(404).json({ error: '글을 찾을 수 없어요' })
+  res.json(found)
+})
+app.post('/api/posts', (req, res) => {
+  // body: NewPost { board, title, body, tags, anonymous, study? }
+  const post = createPost(req.body ?? {})
+  if ('error' in post) return res.status(400).json(post)
+  res.json(post)
+})
+app.post('/api/posts/:id/like', (req, res) => {
+  const post = toggleLike(req.params.id)
+  if (!post) return res.status(404).json({ error: '글을 찾을 수 없어요' })
+  res.json(post)
+})
+app.post('/api/posts/:id/comments', (req, res) => {
+  // body: { body, anonymous, parentId? }  parentId가 있으면 대댓글
+  const comment = addComment(
+    req.params.id,
+    String(req.body?.body ?? ''),
+    !!req.body?.anonymous,
+    req.body?.parentId ? String(req.body.parentId) : undefined,
+  )
+  if ('error' in comment) return res.status(400).json(comment)
+  res.json(comment)
+})
+// 댓글 정보창: 공감 · 차단 · 신고
+app.post('/api/comments/:id/like', (req, res) => {
+  const c = toggleCommentLike(req.params.id)
+  if ('error' in c) return res.status(400).json(c)
+  res.json(c)
+})
+app.post('/api/comments/:id/block', (req, res) => {
+  // 그 댓글 쓴 사람을 차단: 글은 목록에서 빠지고 댓글은 가려진다. 랭킹은 그대로.
+  const r = blockCommentAuthor(req.params.id)
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+app.post('/api/comments/:id/report', (req, res) => {
+  // body: { reason }  관리자 화면의 신고 내역에 쌓인다
+  const r = reportComment(req.params.id, req.body?.reason)
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+// 게시글 ⋮ 메뉴: 차단 · 신고
+app.post('/api/posts/:id/block', (req, res) => {
+  const r = blockPostAuthor(req.params.id)
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+app.post('/api/posts/:id/report', (req, res) => {
+  // body: { reason }
+  const r = reportPost(req.params.id, req.body?.reason)
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+app.patch('/api/posts/:id', (req, res) => {
+  // body: { title, body, tags, anonymous, study? }  게시판은 못 바꾼다. 내 글만.
+  const post = updatePost(req.params.id, req.body ?? {})
+  if ('error' in post) return res.status(400).json(post)
+  res.json(post)
+})
+app.delete('/api/posts/:id', (req, res) => {
+  const r = deletePost(req.params.id)
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+app.post('/api/posts/:id/join', (req, res) => {
+  // 누적 XP가 minXp 이상이고 자리가 있으면 참여 → 응답의 study.contact로 연락처 공개
+  const post = joinPost(req.params.id)
+  if ('error' in post) return res.status(400).json(post)
+  res.json(post)
 })
 
-const PORT = 3001
+const PORT = Number(process.env.PORT) || 3001
 app.listen(PORT, () => {
   console.log(`API server on http://localhost:${PORT}`)
 })

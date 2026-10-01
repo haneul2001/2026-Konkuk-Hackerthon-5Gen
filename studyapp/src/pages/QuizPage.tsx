@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, CircleDot, Folder as FolderIcon, PenLine, ToggleLeft } from 'lucide-react'
+import { Check, CircleDot, Folder as FolderIcon, Loader, PenLine, ToggleLeft } from 'lucide-react'
 import type {
   Concept,
   Folder,
@@ -11,8 +11,7 @@ import type {
   QuizType,
   ReviewItem,
 } from '../../shared/types'
-import { availableCount } from '../../shared/quiz'
-import { api } from '../api/client'
+import { api, ApiError } from '../api/client'
 import { QuizPlayer, type Answer } from '../components/quiz/QuizPlayer'
 import { QuizResult } from '../components/quiz/QuizResult'
 import {
@@ -130,10 +129,15 @@ function Setup({ onStart }: { onStart: (quiz: Quiz) => void }) {
   async function run(make: () => Promise<Quiz | null>) {
     setLoading(true)
     setError('')
-    const quiz = await make()
-    setLoading(false)
-    if (quiz && quiz.questions.length > 0) onStart(quiz)
-    else setError('담긴 개념으로 만들 수 있는 문제가 아직 없어요.')
+    try {
+      const quiz = await make()
+      if (quiz && quiz.questions.length > 0) onStart(quiz)
+      else setError('담긴 개념으로 만들 수 있는 문제가 아직 없어요.')
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : '문제를 만들지 못했어요. 잠시 뒤 다시 해 주세요.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 복습으로 들어온 경우: 고를 것 없이 바로 시작
@@ -257,9 +261,6 @@ function Options({
   const [type, setType] = useState<QuizType>('multiple')
   const [count, setCount] = useState(10)
 
-  const available = availableCount(scope.conceptIds, type)
-  const countOptions = [5, 10, 15, 20].filter((n) => n < available)
-  const effectiveCount = Math.min(count, available)
   const isFolder = scope.source.kind === 'folder'
 
   if (scope.conceptIds.length === 0) {
@@ -296,7 +297,6 @@ function Options({
         <legend className="mb-2.5 text-[17px] font-bold">문제 유형</legend>
         {types.map((t) => {
           const selected = type === t.key
-          const n = availableCount(scope.conceptIds, t.key)
           return (
             <label
               key={t.key}
@@ -306,7 +306,7 @@ function Options({
                 selected
                   ? 'border-primary shadow-[0_3px_0_var(--color-primary)]'
                   : 'border-line shadow-[0_3px_0_var(--color-line)]',
-                n === 0 && 'cursor-not-allowed opacity-50',
+                loading && 'cursor-not-allowed opacity-50',
               )}
             >
               <input
@@ -314,7 +314,7 @@ function Options({
                 name="type"
                 value={t.key}
                 checked={selected}
-                disabled={n === 0}
+                disabled={loading}
                 onChange={() => setType(t.key)}
                 className="sr-only"
               />
@@ -328,9 +328,7 @@ function Options({
               </span>
               <span className="flex-1">
                 <span className="block text-[15px] font-bold">{t.label}</span>
-                <span className="block text-[13px] text-muted">
-                  {n === 0 ? '이 범위엔 문제가 없어요' : t.note}
-                </span>
+                <span className="block text-[13px] text-muted">{t.note}</span>
               </span>
               {selected && <Check className="size-5 text-primary" strokeWidth={3} aria-hidden />}
             </label>
@@ -338,32 +336,44 @@ function Options({
         })}
       </fieldset>
 
-      {available > 0 && (
-        <div>
-          <p className="mb-2.5 text-[17px] font-bold">문항 수</p>
-          <Segmented
-            label="문항 수"
-            value={String(countOptions.includes(effectiveCount) ? effectiveCount : available)}
-            options={[
-              ...countOptions.map((n) => [String(n), `${n}문제`] as const),
-              [String(available), `전체 ${available}`] as const,
-            ]}
-            onChange={(v) => setCount(Number(v))}
-          />
-        </div>
-      )}
+      <div>
+        <p className="mb-2.5 text-[17px] font-bold">문항 수</p>
+        <Segmented
+          label="문항 수"
+          value={String(count)}
+          options={COUNTS.map((n) => [String(n), `${n}문제`] as const)}
+          onChange={(v) => !loading && setCount(Number(v))}
+        />
+      </div>
 
       <StartButton
         loading={loading}
-        disabled={available === 0}
-        onClick={() => onRun(() => api.createQuiz(scope.source, type, effectiveCount))}
+        onClick={() => onRun(() => api.createQuiz(scope.source, type, count))}
       />
+      {loading && <Generating />}
       {error && <ErrorText text={error} />}
 
-      <p className="text-[13px] text-pretty text-muted">
-        지금은 미리 만들어 둔 문제에서 뽑아요. 요약 기반 자동 출제가 붙으면 개념마다 새로 만들어져요.
-      </p>
+      {!loading && (
+        <p className="text-[13px] text-pretty text-muted">
+          누를 때마다 강의 내용으로 새 문제를 만들어요. 전에 틀린 문제도 다시 섞여 나와요.
+        </p>
+      )}
     </div>
+  )
+}
+
+const COUNTS = [5, 10, 15, 20]
+
+// 문제 생성은 15~45초 걸린다. 멈춘 게 아니라는 걸 보여준다.
+function Generating() {
+  return (
+    <Card role="status" className="flex items-center gap-3 p-4">
+      <Loader className="size-6 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+      <div>
+        <p className="text-[15px] font-bold">문제를 만드는 중이에요</p>
+        <p className="mt-0.5 text-[13px] text-muted">강의 내용을 보고 새로 만들어서 15~45초쯤 걸려요.</p>
+      </div>
+    </Card>
   )
 }
 
@@ -386,7 +396,7 @@ function StartButton({
 }) {
   return (
     <Button variant="primary" className="w-full" disabled={loading || disabled} onClick={onClick}>
-      {loading ? '문제 준비 중…' : '시작'}
+      {loading ? '문제 만드는 중…' : '시작'}
     </Button>
   )
 }

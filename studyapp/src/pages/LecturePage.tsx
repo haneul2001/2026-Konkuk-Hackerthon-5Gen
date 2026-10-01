@@ -1,28 +1,56 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Layers, Loader } from 'lucide-react'
+import { CircleAlert, Layers, Loader, Megaphone } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
 
-// 강의 상세: 요약 보기(TTS / 큐카드)와 퀴즈 시작.
+// 강의 상세: 요약 보기(TTS / 플래시카드)와 퀴즈 시작.
+// 업로드 직후엔 처리 중이라 몇 초마다 다시 불러와 단계·진행률을 보여준다.
 
 type Tab = 'cards' | 'tts' | 'text'
+
+const POLL_MS = 3000
+
+const stageLabel: Record<string, string> = {
+  queued: '차례를 기다리는 중',
+  preprocessing: '녹음 소리를 다듬는 중',
+  transcribing: '말을 글로 받아 적는 중',
+  summarizing: '핵심 개념을 정리하는 중',
+}
 
 export function LecturePage() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as Tab) || 'cards'
-  const [lecture, setLecture] = useState<Lecture | null>(null)
+  // undefined: 불러오는 중, null: 없음
+  const [lecture, setLecture] = useState<Lecture | null | undefined>(undefined)
   const [concepts, setConcepts] = useState<Concept[]>([])
+  const status = lecture?.status
 
   useEffect(() => {
-    api.lectures().then((list) => setLecture(list.find((l) => l.id === id) ?? null))
-    api.concepts().then((list) => setConcepts(list.filter((c) => c.lectureId === id)))
+    if (id) api.lecture(id).then(setLecture)
   }, [id])
 
+  useEffect(() => {
+    if (!id || status !== 'processing') return
+    const timer = setInterval(() => api.lecture(id).then(setLecture), POLL_MS)
+    return () => clearInterval(timer)
+  }, [id, status])
+
+  // 요약이 끝나야 개념이 생긴다
+  useEffect(() => {
+    if (status === 'ready') {
+      api.concepts().then((list) => setConcepts(list.filter((c) => c.lectureId === id)))
+    }
+  }, [id, status])
+
   if (!lecture) {
-    return <p className="text-[15px] text-muted">강의를 불러오는 중이거나 찾을 수 없어요.</p>
+    return (
+      <p className="text-[15px] text-muted">
+        {lecture === undefined ? '강의를 불러오는 중이에요.' : '강의를 찾을 수 없어요.'}
+      </p>
+    )
   }
 
   return (
@@ -35,6 +63,8 @@ export function LecturePage() {
             {lecture.durationMin}분
             {lecture.status === 'ready' ? (
               <Tag tone="success">요약 완료</Tag>
+            ) : lecture.status === 'failed' ? (
+              <Tag tone="danger">처리 실패</Tag>
             ) : (
               <Tag tone="accent">요약 중</Tag>
             )}
@@ -43,11 +73,20 @@ export function LecturePage() {
       </div>
 
       {lecture.status === 'processing' ? (
+        <Processing lecture={lecture} />
+      ) : lecture.status === 'failed' ? (
         <Card className="flex flex-col items-center px-5 py-10 text-center">
-          <Loader className="size-7 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
-          <p className="mt-3 text-[15px] text-muted">요약을 만들고 있어요. 끝나면 알려드릴게요.</p>
-          <ButtonLink to="/" className="mt-5">
-            홈으로
+          <CircleAlert className="size-7 text-danger" aria-hidden />
+          <p className="mt-3 text-[16px] font-bold">녹음을 처리하지 못했어요</p>
+          {lecture.error && (
+            <p className="mt-1.5 text-[14px] text-pretty text-muted">{lecture.error}</p>
+          )}
+          <ButtonLink
+            to={`/record?mode=upload&course=${encodeURIComponent(lecture.course)}`}
+            variant="primary"
+            className="mt-5 w-full"
+          >
+            다시 올리기
           </ButtonLink>
         </Card>
       ) : (
@@ -56,7 +95,7 @@ export function LecturePage() {
             label="요약 보기 방식"
             value={tab}
             options={[
-              ['cards', '큐카드'],
+              ['cards', '플래시카드'],
               ['tts', '듣기'],
               ['text', '전체 요약'],
             ]}
@@ -67,14 +106,14 @@ export function LecturePage() {
             (concepts.length > 0 ? (
               <Card className="space-y-4 p-4">
                 <div>
-                  <p className="text-[17px] font-bold">큐카드 {concepts.length}장</p>
+                  <p className="text-[17px] font-bold">플래시카드 {concepts.length}장</p>
                   <p className="mt-1 text-[14px] text-muted">
                     설명을 보고 개념을 떠올린 뒤, 뒤집어서 확인해요.
                   </p>
                 </div>
-                <ButtonLink to={`/cards?lecture=${lecture.id}`} variant="primary" className="w-full">
+                <ButtonLink to={`/flashcards?lecture=${lecture.id}`} variant="primary" className="w-full">
                   <Layers className="size-5" aria-hidden />
-                  큐카드 넘기기
+                  플래시카드 넘기기
                 </ButtonLink>
               </Card>
             ) : (
@@ -87,6 +126,25 @@ export function LecturePage() {
               endpoint="GET /api/lectures/:id/audio"
               owner="나"
             />
+          )}
+          {tab === 'text' && lecture.overview && (
+            <Card className="p-4">
+              <p className="text-[13px] font-semibold text-muted">강의 개요</p>
+              <p className="mt-1.5 text-[15px] leading-relaxed text-pretty">{lecture.overview}</p>
+            </Card>
+          )}
+          {tab === 'text' && (lecture.announcements?.length ?? 0) > 0 && (
+            <Card className="p-4">
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent-ink">
+                <Megaphone className="size-4" aria-hidden />
+                시험·과제 공지
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] leading-relaxed">
+                {lecture.announcements!.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </Card>
           )}
           {tab === 'text' && concepts.length > 0 && (
             <Card>
@@ -130,5 +188,28 @@ export function LecturePage() {
         </>
       )}
     </div>
+  )
+}
+
+function Processing({ lecture }: { lecture: Lecture }) {
+  const label = stageLabel[lecture.stage ?? ''] ?? '요약을 만드는 중'
+  // 진행률은 받아 적는 단계에서만 온다
+  const pct = lecture.stage === 'transcribing' && lecture.progress != null ? Math.round(lecture.progress * 100) : null
+  return (
+    <Card role="status" className="flex flex-col items-center px-5 py-10 text-center">
+      <Loader className="size-7 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+      <p className="mt-3 text-[16px] font-bold">{label}</p>
+      {pct !== null && (
+        <div className="mt-3 h-2.5 w-full max-w-60 overflow-hidden rounded-full bg-line">
+          <div className="h-full rounded-full bg-bright transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      <p className="mt-3 text-[14px] text-pretty text-muted">
+        2시간 녹음 기준 2~3분 걸려요. 다른 화면에 가 있어도 계속 처리돼요.
+      </p>
+      <ButtonLink to="/" className="mt-5">
+        홈으로
+      </ButtonLink>
+    </Card>
   )
 }

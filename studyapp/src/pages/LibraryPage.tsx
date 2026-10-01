@@ -187,15 +187,15 @@ export function LibraryPage() {
         ))}
       </div>
 
-      {/* 큐카드 진입: 지금 고른 과목의 개념을 넘겨 본다 */}
+      {/* 플래시카드 진입: 지금 고른 과목의 개념을 넘겨 본다 */}
       {tab === 'concepts' && cardCount > 0 && (
         <ButtonLink
-          to={course ? `/cards?course=${encodeURIComponent(course)}` : '/cards'}
+          to={course ? `/flashcards?course=${encodeURIComponent(course)}` : '/flashcards'}
           variant="primary"
           className="w-full"
         >
           <Layers className="size-5" aria-hidden />
-          {course || '전체'} 개념 큐카드로 외우기
+          {course || '전체'} 개념 플래시카드로 외우기
           <span className="tabular-nums opacity-80">{cardCount}장</span>
         </ButtonLink>
       )}
@@ -226,7 +226,11 @@ export function LibraryPage() {
                       </span>
                     }
                     trailing={
-                      l.status === 'processing' ? <Tag tone="accent">요약 중</Tag> : null
+                      l.status === 'processing' ? (
+                        <Tag tone="accent">요약 중</Tag>
+                      ) : l.status === 'failed' ? (
+                        <Tag tone="danger">처리 실패</Tag>
+                      ) : null
                     }
                   />
                 </li>

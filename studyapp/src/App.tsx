@@ -2,7 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { AdminPage } from './pages/AdminPage'
 import { BoardPage } from './pages/BoardPage'
-import { CardsPage } from './pages/CardsPage'
+import { FlashcardsPage } from './pages/FlashcardsPage'
 import { FolderPage } from './pages/FolderPage'
 import { HomePage } from './pages/HomePage'
 import { LecturePage } from './pages/LecturePage'
@@ -21,7 +21,7 @@ export default function App() {
         <Route path="library/folders/:id" element={<FolderPage />} />
         <Route path="lectures/:id" element={<LecturePage />} />
         <Route path="quiz" element={<QuizPage />} />
-        <Route path="cards" element={<CardsPage />} />
+        <Route path="flashcards" element={<FlashcardsPage />} />
         <Route path="ranking" element={<RankingPage />} />
         <Route path="board" element={<BoardPage />} />
         <Route path="admin" element={<AdminPage />} />

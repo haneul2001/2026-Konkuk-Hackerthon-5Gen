@@ -6,10 +6,10 @@ import {
   ShieldCheck,
   House,
   LibraryBig,
+  MessagesSquare,
   Mic,
   Signal,
   Trophy,
-  UsersRound,
   Wifi,
 } from 'lucide-react'
 import { cn } from '../lib/cn'
@@ -30,13 +30,13 @@ const tabs = [
   { to: '/library', label: LIBRARY_NAME, icon: LibraryBig },
   { to: '/record', label: '녹음', icon: Mic, center: true },
   { to: '/ranking', label: '랭킹', icon: Trophy },
-  { to: '/board', label: '스터디', icon: UsersRound },
+  { to: '/board', label: '게시판', icon: MessagesSquare },
 ]
 
 const TAB_ROOTS = tabs.map((t) => t.to)
 // 퀴즈는 탭이 아니라 강의·복습에서 들어간다.
 // 탭 루트라도 이 쿼리가 붙으면 하위 화면(상세·글쓰기 등)이라 뒤로 버튼을 보인다.
-const SUB_VIEW = /[?&](post|write|review|lecture|folder)=/
+const SUB_VIEW = /[?&](post|write|edit|review|lecture|folder)=/
 
 export function Layout() {
   const { pathname, search } = useLocation()
