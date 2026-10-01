@@ -152,6 +152,13 @@ export type Concept = {
   mastery: 'new' | 'learning' | 'mastered' // 새 개념 | 익히는 중 | 외움 (퀴즈 결과로 갱신)
 }
 
+// 녹음 다시 듣기 자막 한 줄. start·end는 녹음 시작부터의 초
+export type TranscriptSegment = {
+  start: number
+  end: number
+  text: string
+}
+
 export type QuizType = 'multiple' | 'ox' | 'essay'
 
 // 개념 폴더. 사용자가 직접 만들고 개념을 담는다. 한 개념을 여러 폴더에 담을 수 있다(재생목록 방식).

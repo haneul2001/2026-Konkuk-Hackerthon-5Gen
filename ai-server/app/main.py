@@ -363,7 +363,22 @@ def get_audio_file(lecture_id: str):
         path = config.DATA_DIR / lec.audio_path if lec.audio_path else None
     if not path or not path.exists():
         raise HTTPException(404, "녹음 원본이 없어요")
-    return FileResponse(path, media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+    # Windows는 .aac를 audio/vnd.dlna.adts 처럼 브라우저가 모르는 형식으로 알려줘서 직접 정한다
+    media_type = _AUDIO_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type)
+
+
+_AUDIO_TYPES = {
+    ".aac": "audio/aac",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".flac": "audio/flac",
+}
 
 
 @app.post("/api/lectures/{lecture_id}/summary", status_code=202)

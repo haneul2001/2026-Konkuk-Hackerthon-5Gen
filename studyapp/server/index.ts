@@ -40,11 +40,14 @@ app.use(express.json())
 async function forward(req: express.Request, res: express.Response, body?: unknown) {
   try {
     const isJson = body !== undefined || !!req.is('application/json')
+    const headers: Record<string, string> = isJson
+      ? { 'Content-Type': 'application/json' }
+      : { 'Content-Type': req.headers['content-type'] ?? '' }
+    // 녹음 다시 듣기에서 중간으로 넘길 수 있게 구간 요청을 그대로 넘긴다 (206 Partial Content)
+    if (req.headers.range) headers.Range = req.headers.range
     const init: RequestInit & { duplex: 'half' } = {
       method: req.method,
-      headers: isJson
-        ? { 'Content-Type': 'application/json' }
-        : { 'Content-Type': req.headers['content-type'] ?? '' },
+      headers,
       body:
         req.method === 'GET'
           ? undefined
@@ -77,6 +80,8 @@ app.post('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
+// 녹음 다시 듣기 자막: [{ start, end, text }] (초 단위)
+app.get('/api/lectures/:id/transcript', (req, res) => forward(req, res))
 // 서재의 개념 카드. ?lecture=ID 로 강의별 필터.
 app.get('/api/concepts', (req, res) => forward(req, res))
 

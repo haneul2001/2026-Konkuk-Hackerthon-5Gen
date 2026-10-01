@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { CircleAlert, Layers, Loader, Megaphone } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
+import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
 
 // 강의 상세: 요약 보기(TTS / 플래시카드)와 퀴즈 시작.
@@ -23,6 +24,7 @@ export function LecturePage() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as Tab) || 'cards'
+  const listen = params.get('listen') === 'recording' ? 'recording' : 'summary'
   // undefined: 불러오는 중, null: 없음
   const [lecture, setLecture] = useState<Lecture | null | undefined>(undefined)
   const [concepts, setConcepts] = useState<Concept[]>([])
@@ -120,12 +122,23 @@ export function LecturePage() {
               <p className="text-[15px] text-muted">이 강의에서 뽑힌 개념이 아직 없어요.</p>
             ))}
           {tab === 'tts' && (
-            <Placeholder
-              title="요약 듣기(TTS)"
-              description="요약을 음성으로 재생. 5분마다 XP 지급, 하루 상한 있음."
-              endpoint="GET /api/lectures/:id/audio"
-              owner="나"
-            />
+            <>
+              <Segmented
+                label="듣기 방식"
+                value={listen}
+                options={[
+                  ['summary', '요약 듣기'],
+                  ['recording', '녹음 다시 듣기'],
+                ]}
+                onChange={(key) => setParams({ tab: 'tts', listen: key }, { replace: true })}
+              />
+              {/* TODO: 요약 듣기 5분마다 XP (POST /api/xp tts_5min) */}
+              {listen === 'summary' ? (
+                <SummaryPlayer lecture={lecture} concepts={concepts} />
+              ) : (
+                <RecordingPlayer lectureId={lecture.id} />
+              )}
+            </>
           )}
           {tab === 'text' && lecture.overview && (
             <Card className="p-4">

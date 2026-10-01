@@ -16,6 +16,7 @@ import type {
   QuizSubmitResult,
   QuizType,
   ReviewItem,
+  TranscriptSegment,
   UserSummary,
 } from '../../shared/types'
 import * as mock from '../../shared/mock'
@@ -97,6 +98,10 @@ export const api = {
     get<Lecture | null>(`/api/lectures/${id}`, mock.lectures.find((l) => l.id === id) ?? null),
   // form: audio(파일), course, title?, recordedAt?(YYYY-MM-DD)
   uploadLecture: upload,
+  // 녹음 다시 듣기: 원본 오디오 주소와 시간이 붙은 자막. 목 데이터에는 녹음이 없다.
+  audioUrl: (id: string) => `/api/lectures/${id}/audio-file`,
+  transcript: (id: string) =>
+    get<{ text: string | null; segments: TranscriptSegment[] } | null>(`/api/lectures/${id}/transcript`, null),
   league: () => get<LeagueEntry[]>('/api/league', mock.league),
 
   // 게시판
