@@ -219,7 +219,7 @@ export type RecordingFolder = {
 }
 
 // ---- 퀴즈 ----
-// 문제는 AI 서버가 강의 전사본으로 만든다. 서버가 꺼져 있으면 shared/quizBank.ts의 목 문제를 쓴다.
+// 문제는 AI 서버가 강의 전사본으로 만든다. 서버가 꺼져 있으면 shared/quizBank.ts(지금은 비어 있음)를 쓴다.
 
 type QuestionBase = {
   id: string

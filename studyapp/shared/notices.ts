@@ -120,6 +120,12 @@ export function sampleNotice(kind: Notice['kind']): Notice {
         to: lecture ? `/lectures/${lecture.id}` : '/library',
       }
     case 'study':
-      return { id, kind, title: '이제 참여할 수 있는 스터디가 있어요', body: post.title, to: `/board?post=${post.id}` }
+      return {
+        id,
+        kind,
+        title: '이제 참여할 수 있는 스터디가 있어요',
+        body: post?.title ?? '자료구조 중간고사 대비 스터디',
+        to: post ? `/board?post=${post.id}` : '/board?board=study',
+      }
   }
 }

@@ -9,6 +9,7 @@ import type { Mood, UserSummary } from './types'
 type StudyRecord = Pick<UserSummary, 'lastStudyDate' | 'todaySolved' | 'dailyGoal' | 'streakDays'>
 
 export function daysSinceStudy(me: StudyRecord, today = localDate()) {
+  if (!me.lastStudyDate) return 0 // 아직 푼 적 없음: 쉰 날로 치지 않는다
   const a = Date.parse(`${me.lastStudyDate}T00:00:00`)
   const b = Date.parse(`${today}T00:00:00`)
   return Math.max(0, Math.round((b - a) / 86_400_000))

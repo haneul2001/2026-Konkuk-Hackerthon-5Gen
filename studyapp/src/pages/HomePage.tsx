@@ -234,6 +234,10 @@ export function HomePage() {
       <Section title="스터디 모집" action={{ label: '더 보기', to: '/board?board=study' }}>
         {posts === null || me === null ? (
           <ListSkeleton rows={2} />
+        ) : posts.length === 0 ? (
+          <p className="rounded-2xl border-2 border-line bg-surface px-4 py-6 text-center text-[14px] text-muted">
+            아직 모집 중인 스터디가 없어요.
+          </p>
         ) : (
           <Card>
             <ul className="divide-y-2 divide-line">

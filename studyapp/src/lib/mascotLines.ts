@@ -40,7 +40,9 @@ const lines: Record<Mood, (c: LineContext) => string[]> = {
     '어제 기다렸는데. 오늘 한 문제만 풀면 기분 풀릴 것 같아.',
   ],
   normal: ({ streak, goal, reviewCount }) => [
-    `연속 ${streak}일째! 7일을 채우면 나 조금 더 기뻐질 거야.`,
+    streak > 0
+      ? `연속 ${streak}일째! 7일을 채우면 나 조금 더 기뻐질 거야.`
+      : '첫 문제를 풀면 연속 기록이 시작돼. 같이 해보자!',
     reviewCount > 0
       ? `복습 ${reviewCount}문제가 기다려. 꾸준함이 제일 세.`
       : '오늘도 개념 하나씩 쌓아보자. 꾸준함이 제일 세.',
