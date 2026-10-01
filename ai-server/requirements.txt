@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+faster-whisper
+imageio-ffmpeg
+# NVIDIA GPU용 (CPU로 돌릴 땐 생략 가능)
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
+sqlalchemy
+python-dotenv
+# 요약 LLM
+anthropic
+google-genai
+ollama
