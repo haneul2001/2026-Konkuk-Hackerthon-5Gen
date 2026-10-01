@@ -318,7 +318,7 @@ function Options({
               <span
                 className={cn(
                   'flex size-10 items-center justify-center rounded-xl',
-                  selected ? 'bg-primary text-white' : 'bg-bg text-muted',
+                  selected ? 'bg-highlight text-primary-deep' : 'bg-bg text-muted',
                 )}
               >
                 <t.icon className="size-5" aria-hidden />

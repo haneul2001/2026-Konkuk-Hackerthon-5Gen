@@ -266,7 +266,7 @@ function ChoiceButton({
             : state === 'wrong'
               ? 'border-danger bg-danger text-white'
               : selected
-                ? 'border-primary bg-primary text-white'
+                ? 'border-highlight-deep bg-highlight text-primary-deep'
                 : 'border-line-strong text-muted',
         )}
         aria-hidden

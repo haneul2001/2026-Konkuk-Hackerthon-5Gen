@@ -32,6 +32,7 @@ import {
   updateRecordingFolder,
 } from '../shared/recordingFolders'
 import { addTag, removeTag, setLectureTags, tagState } from '../shared/recordingTags'
+import { getKeywords, setKeywords } from '../shared/boardKeywords'
 import { currentNotices } from '../shared/notices'
 import { current, refreshLeague, setLeagueOpponents } from '../shared/session'
 import { submitQuiz, type GradedResult } from '../shared/quiz'
@@ -172,6 +173,14 @@ app.get('/api/concepts', (req, res) => forward(req, res))
 // ---- 학습 탭(폴더) ----
 // 개념 폴더: 사용자가 만들고 개념을 담는다. 폴더 단위로 퀴즈가 나온다.
 // 녹음 태그: 사용자가 만든 태그를 녹음에 단다. 응답은 항상 { tags, byLecture } 전체
+// 게시판 키워드 줄: 사용자가 넣고 뺀다. null이면 아직 안 고침
+app.get('/api/board-keywords', (_req, res) => res.json({ keywords: getKeywords() }))
+app.put('/api/board-keywords', (req, res) => {
+  // body: { keywords: string[] }
+  const r = setKeywords(req.body?.keywords)
+  if ('error' in r) return res.status(400).json(r)
+  res.json({ keywords: r })
+})
 app.get('/api/recording-tags', (_req, res) => res.json(tagState()))
 app.post('/api/recording-tags', (req, res) => {
   // body: { name }

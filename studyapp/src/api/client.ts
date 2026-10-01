@@ -27,6 +27,7 @@ import * as board from '../../shared/board'
 import * as folderStore from '../../shared/folders'
 import * as recFolders from '../../shared/recordingFolders'
 import * as recTags from '../../shared/recordingTags'
+import * as boardKeywords from '../../shared/boardKeywords'
 import * as profile from '../../shared/profile'
 import * as cards from '../../shared/cards'
 import * as notices from '../../shared/notices'
@@ -190,6 +191,15 @@ export const api = {
       () => board.addComment(id, body, anonymous, parentId),
     ),
   concepts: () => get<Concept[]>('/api/concepts', mock.concepts),
+
+  // 게시판 키워드 줄
+  boardKeywords: () =>
+    get<{ keywords: string[] | null }>('/api/board-keywords', { keywords: boardKeywords.getKeywords() }),
+  setBoardKeywords: (keywords: string[]) =>
+    send<{ keywords: string[] } | { error: string }>('PUT', '/api/board-keywords', { keywords }, () => {
+      const r = boardKeywords.setKeywords(keywords)
+      return 'error' in r ? r : { keywords: r }
+    }),
 
   // 녹음 태그
   recordingTags: () => get<recTags.RecordingTagState>('/api/recording-tags', recTags.tagState()),

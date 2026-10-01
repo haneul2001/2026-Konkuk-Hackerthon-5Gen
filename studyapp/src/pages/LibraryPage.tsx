@@ -567,7 +567,7 @@ function FolderGrid<T extends { id: string; name: string }>({
                   aria-hidden
                   className={cn(
                     'absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border-2',
-                    f.id === moving ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface',
+                    f.id === moving ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line-strong bg-surface',
                   )}
                 >
                   {f.id === moving && <Check className="size-4" strokeWidth={3} />}
@@ -857,7 +857,7 @@ function FileLectureSheet({
               onClick={() => setTags(on ? tags.filter((x) => x !== t) : [...tags, t])}
               className={cn(
                 'h-9 cursor-pointer rounded-full border-2 px-3.5 text-[14px] font-semibold',
-                on ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-muted',
+                on ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line bg-surface text-muted',
               )}
             >
               #{t}
@@ -982,7 +982,7 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
       className={cn(
         'h-11 shrink-0 cursor-pointer rounded-full border-2 px-4 text-sm font-semibold',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-        active ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-muted',
+        active ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line bg-surface text-muted',
       )}
     >
       {label}
@@ -993,9 +993,9 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 // 페이지 버튼: 이전 · 1 2 3 · 다음
 function Pager({ page, count, onGo }: { page: number; count: number; onGo: (n: number) => void }) {
   const btn =
-    'flex h-10 min-w-10 cursor-pointer items-center justify-center rounded-xl px-3 text-[14px] font-bold focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40'
+    'flex h-10 min-w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl px-3 text-[14px] font-bold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40'
   return (
-    <nav aria-label="녹음 목록 페이지" className="flex items-center justify-center gap-1.5">
+    <nav aria-label="페이지" className="flex items-center justify-center gap-1">
       <button type="button" className={cn(btn, 'text-muted')} disabled={page === 1} onClick={() => onGo(page - 1)}>
         이전
       </button>
@@ -1005,7 +1005,7 @@ function Pager({ page, count, onGo }: { page: number; count: number; onGo: (n: n
           type="button"
           aria-current={n === page ? 'page' : undefined}
           onClick={() => onGo(n)}
-          className={cn(btn, 'tabular-nums', n === page ? 'bg-primary text-white' : 'border-2 border-line bg-surface text-muted')}
+          className={cn(btn, 'tabular-nums', n === page ? 'bg-highlight text-primary-deep shadow-[0_2px_0_var(--color-highlight-deep)]' : 'border-2 border-line bg-surface text-muted')}
         >
           {n}
         </button>

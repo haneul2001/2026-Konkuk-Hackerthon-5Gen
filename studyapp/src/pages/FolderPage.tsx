@@ -316,7 +316,7 @@ function ConceptPicker({
                           aria-hidden
                           className={cn(
                             'flex size-6 shrink-0 items-center justify-center rounded-md border-2',
-                            on ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface',
+                            on ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line-strong bg-surface',
                           )}
                         >
                           {on && <Check className="size-4" strokeWidth={3} />}

@@ -16,6 +16,7 @@ export type UserState = {
   wrongAnswers: Map<string, Set<string>> // 강의 id → 틀린 문제 id
   joinedByMe: Set<string> // 참여한 스터디 글 id
   blockedUsers: Set<string> // 차단한 사람(authorId)
+  boardKeywords: string[] | null // 게시판 키워드 줄. null이면 아직 안 고침(많이 쓰인 태그를 보여 준다)
 }
 
 export function newUserState(id: string, login: string, name: string): UserState {
@@ -41,6 +42,7 @@ export function newUserState(id: string, login: string, name: string): UserState
     wrongAnswers: new Map(),
     joinedByMe: new Set(),
     blockedUsers: new Set(),
+    boardKeywords: null,
   }
 }
 
@@ -127,5 +129,6 @@ export function deserializeUser(data: unknown): UserState | null {
   }
   if (Array.isArray(d.joinedByMe)) base.joinedByMe = new Set(d.joinedByMe.map(String))
   if (Array.isArray(d.blockedUsers)) base.blockedUsers = new Set(d.blockedUsers.map(String))
+  if (Array.isArray(d.boardKeywords)) base.boardKeywords = d.boardKeywords.map(String)
   return base
 }

@@ -10,6 +10,7 @@ import {
 import { REPORT_REASONS } from '../../shared/types'
 import type { BoardComment, BoardKind, BoardPost, ReportReason, UserSummary } from '../../shared/types'
 import { BOARDS, cleanTags, matches } from '../../shared/board'
+import { cleanTag } from '../../shared/recordingTags'
 import { api } from '../api/client'
 import { Button, Field, ListSkeleton, PageTitle, Segmented, Sheet, Tag } from '../components/ui'
 import { Avatar } from '../components/Avatar'
@@ -62,6 +63,34 @@ function BoardList({ board, tag }: { board: BoardKind; tag: string }) {
     for (const p of posts ?? []) for (const t of p.tags) count.set(t, (count.get(t) ?? 0) + 1)
     return [...count].sort((a, b) => b[1] - a[1]).map(([t]) => t)
   }, [posts])
+
+  // 키워드 줄: 내가 넣고 뺀 목록. 한 번도 안 고쳤으면(null) 많이 쓰인 태그 8개를 보여 준다
+  const [custom, setCustom] = useState<string[] | null | undefined>(undefined)
+  useEffect(() => {
+    api.boardKeywords().then((r) => setCustom(r.keywords))
+  }, [])
+  const keywords = custom ?? tags.slice(0, 8)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [kwError, setKwError] = useState('')
+
+  async function saveKeywords(next: string[]) {
+    const r = await api.setBoardKeywords(next)
+    if ('error' in r) return setKwError(r.error)
+    setKwError('')
+    setCustom(r.keywords)
+  }
+  function addKeyword() {
+    const t = cleanTag(draft)
+    if (!t) return
+    if (keywords.includes(t)) return setKwError('이미 있는 키워드예요')
+    setDraft('')
+    void saveKeywords([...keywords, t])
+  }
+  function removeKeyword(t: string) {
+    if (tag === t) go({ tag: '' })
+    void saveKeywords(keywords.filter((k) => k !== t))
+  }
 
   // 검색어는 주소가 아니라 로컬 상태로 둔다(한글 조합이 깨지지 않게)
   const [searching, setSearching] = useState(false)
@@ -126,27 +155,90 @@ function BoardList({ board, tag }: { board: BoardKind; tag: string }) {
         />
       </div>
 
-      {/* 태그: 누르면 그 태그 글만 */}
-      <div className="no-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5" role="group" aria-label="태그">
-        {['', ...tags].map((t) => (
-          <button
-            key={t || 'all'}
-            type="button"
-            aria-pressed={tag === t}
-            onClick={() => go({ tag: t })}
-            className={cn(
-              'h-9 shrink-0 cursor-pointer rounded-full border-2 px-3.5 text-[14px] font-semibold',
-              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-              tag === t ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-muted',
-            )}
-          >
-            {t ? `#${t}` : '전체'}
-          </button>
-        ))}
+      {/* 키워드: 누르면 그 태그 글만. 넘치면 다음 줄로. '편집'에서 넣고 뺀다 */}
+      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="키워드">
+        {['', ...keywords].map((t) => {
+          const on = tag === t
+          const chip = cn(
+            'flex h-9 shrink-0 items-center rounded-full border-2 text-[14px] font-semibold',
+            on ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line bg-surface text-muted',
+          )
+          return editing && t ? (
+            <span key={t} className={cn(chip, 'pr-1 pl-3.5')}>
+              #{t}
+              <button
+                type="button"
+                aria-label={`#${t} 키워드 빼기`}
+                onClick={() => removeKeyword(t)}
+                className="ml-0.5 flex size-7 cursor-pointer items-center justify-center rounded-full active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            </span>
+          ) : (
+            <button
+              key={t || 'all'}
+              type="button"
+              aria-pressed={on}
+              onClick={() => go({ tag: t })}
+              className={cn(
+                chip,
+                'cursor-pointer px-3.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              )}
+            >
+              {t ? `#${t}` : '전체'}
+            </button>
+          )
+        })}
+        {editing && (
+          <input
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              setKwError('')
+            }}
+            onKeyDown={(e) => {
+              // 한글 조합 중 Enter는 무시(글자가 두 번 들어가지 않게)
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                addKeyword()
+              }
+            }}
+            onBlur={addKeyword}
+            maxLength={16}
+            placeholder="+ 키워드"
+            aria-label="새 키워드"
+            className="h-9 w-28 rounded-full border-2 border-dashed border-line-strong bg-surface px-3.5 text-[14px] placeholder:text-primary-deep/70 focus:border-primary focus:outline-none"
+          />
+        )}
+        <button
+          type="button"
+          aria-pressed={editing}
+          onClick={() => {
+            if (editing) addKeyword()
+            setEditing((v) => !v)
+            setKwError('')
+          }}
+          className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[14px] font-semibold text-muted active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          {editing ? (
+            '완료'
+          ) : (
+            <>
+              <Pencil className="size-4" aria-hidden />
+              편집
+            </>
+          )}
+        </button>
       </div>
+      {kwError && (
+        <p role="alert" className="mt-2 text-[13px] font-semibold text-danger">
+          {kwError}
+        </p>
+      )}
 
       {/* 글 목록: 화면 끝까지 붙는 에타식 리스트 */}
-      <div className="-mx-5 mt-4 flex-1 border-t-2 border-line bg-surface">
+      <div className="mt-4 overflow-hidden rounded-2xl border-2 border-line bg-surface shadow-[0_3px_0_var(--color-line)]">
         {posts === null ? (
           <div className="p-5">
             <ListSkeleton rows={4} />
@@ -197,7 +289,7 @@ function PostItem({ post, me, onOpen }: { post: BoardPost; me: UserSummary | nul
         <p className="truncate text-[16px] font-bold">{post.title}</p>
         <p className="mt-1 line-clamp-2 text-[14px] leading-snug whitespace-pre-line text-ink/80">{post.body}</p>
         {s && (
-          <p className="mt-1.5 text-[13px] font-semibold text-primary tabular-nums">
+          <p className="mt-1.5 text-[13px] font-semibold text-accent-ink tabular-nums">
             {s.course} · {s.joined}/{s.capacity}명 · XP {s.minXp.toLocaleString()} 이상
           </p>
         )}
@@ -218,7 +310,7 @@ function PostMeta({ post }: { post: BoardPost }) {
         </span>
       )}
       {post.commentCount > 0 && (
-        <span className="flex items-center gap-0.5 font-semibold text-primary tabular-nums">
+        <span className="flex items-center gap-0.5 font-semibold text-accent-ink tabular-nums">
           <MessageCircle className="size-3.5" aria-label="댓글" />
           {post.commentCount}
         </span>
@@ -229,7 +321,7 @@ function PostMeta({ post }: { post: BoardPost }) {
       </span>
       <span>{post.author}</span>
       {post.tags.map((t) => (
-        <span key={t} className="text-primary">
+        <span key={t} className="text-accent-ink">
           #{t}
         </span>
       ))}
@@ -354,7 +446,7 @@ function PostDetail({ id }: { id: string }) {
       <h1 className="mt-4 text-[20px] leading-snug font-bold text-balance">{post.title}</h1>
       <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-line text-pretty">{post.body}</p>
       {post.tags.length > 0 && (
-        <p className="mt-3 flex flex-wrap gap-x-2 text-[14px] font-semibold text-primary">
+        <p className="mt-3 flex flex-wrap gap-x-2 text-[14px] font-semibold text-accent-ink">
           {post.tags.map((t) => (
             <span key={t}>#{t}</span>
           ))}
@@ -379,7 +471,7 @@ function PostDetail({ id }: { id: string }) {
           <ThumbsUp className="size-4" aria-hidden />
           공감 {post.likes}
         </button>
-        <span className="flex items-center gap-1 text-[13px] font-semibold text-primary tabular-nums">
+        <span className="flex items-center gap-1 text-[13px] font-semibold text-accent-ink tabular-nums">
           <MessageCircle className="size-4" aria-hidden />
           댓글 {post.commentCount}
         </span>

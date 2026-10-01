@@ -72,8 +72,9 @@ export function Card({
 type Variant = 'primary' | 'secondary' | 'inverse' | 'danger'
 
 const variants: Record<Variant, string> = {
+  // 강조 버튼: 쿠 노랑, 아래쪽만 그림자
   primary:
-    'bg-primary text-white shadow-[0_4px_0_var(--color-primary-deep)] active:shadow-[0_2px_0_var(--color-primary-deep)]',
+    'bg-highlight text-primary-deep shadow-[0_4px_0_var(--color-highlight-deep)] active:shadow-[0_2px_0_var(--color-highlight-deep)]',
   secondary:
     'border-2 border-line-strong bg-surface text-ink shadow-[0_4px_0_var(--color-line-strong)] active:shadow-[0_2px_0_var(--color-line-strong)]',
   danger:

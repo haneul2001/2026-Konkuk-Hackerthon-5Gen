@@ -85,9 +85,9 @@ export function Layout() {
   return (
     <PhoneFrame>
       <StatusBar />
-      {/* 상단 배너: 상태바 아래 화면 폭 가득 건국대 초록 띠, 네 면 모두 연두 외곽선 */}
+      {/* 상단 배너: 상태바 아래 화면 폭 가득 쿠 진녹색 띠, 아래쪽에만 노란 선 */}
       {!immersive && (
-        <div className="relative z-10 mt-[env(safe-area-inset-top)] mb-1 shrink-0 border border-b-2 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
+        <div className="relative z-10 mt-[env(safe-area-inset-top)] mb-1 shrink-0 border-b-2 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
           <TopBar isRoot={isRoot} avatar={avatar} />
         </div>
       )}
@@ -155,7 +155,7 @@ function TopBar({ isRoot, avatar }: { isRoot: boolean; avatar: string }) {
     <header className="flex h-14 shrink-0 items-center justify-between px-3">
       {isRoot ? (
         <span className="px-2 text-[20px] font-extrabold tracking-tight">
-          <span className="text-highlight">{APP_NAME.slice(0, 1)}</span>
+          <span className="text-lime">{APP_NAME.slice(0, 1)}</span>
           {APP_NAME.slice(1)}
         </span>
       ) : (
@@ -219,7 +219,7 @@ function TabBar() {
                 cn(
                   'flex min-h-14 w-full cursor-pointer flex-col items-center justify-center gap-0.5 pt-1.5 text-[11px] font-semibold',
                   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
-                  isActive ? 'text-primary' : 'text-muted',
+                  isActive ? 'text-primary-deep' : 'text-muted',
                 )
               }
             >
@@ -233,7 +233,14 @@ function TabBar() {
                   </>
                 ) : (
                   <>
-                    <Icon className="size-6" strokeWidth={isActive ? 2.5 : 2} aria-hidden />
+                    <span
+                      className={cn(
+                        'flex h-7 w-12 items-center justify-center rounded-full',
+                        isActive && 'bg-highlight-soft',
+                      )}
+                    >
+                      <Icon className="size-6" strokeWidth={isActive ? 2.5 : 2} aria-hidden />
+                    </span>
                     <span>{label}</span>
                   </>
                 )
