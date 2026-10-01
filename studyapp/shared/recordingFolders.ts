@@ -1,7 +1,7 @@
-import { recordingFolders } from './mock'
+import { current } from './session'
 import type { RecordingFolder } from './types'
 
-// 녹음 폴더 만들기·수정·삭제·순서 바꾸기. 개념 폴더(folders.ts)와 같은 방식이다.
+// 녹음 폴더 만들기·수정·삭제·순서 바꾸기. 개념 폴더(folders.ts)와 같은 방식이고 사용자별이다.
 // 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
 
 export function createRecordingFolder(name: string, lectureIds: string[] = []): RecordingFolder {
@@ -11,7 +11,7 @@ export function createRecordingFolder(name: string, lectureIds: string[] = []): 
     lectureIds: uniq(lectureIds),
     createdAt: new Date().toISOString().slice(0, 10),
   }
-  recordingFolders.push(folder)
+  current().recordingFolders.push(folder)
   return folder
 }
 
@@ -19,7 +19,7 @@ export function updateRecordingFolder(
   id: string,
   patch: { name?: string; lectureIds?: string[] },
 ): RecordingFolder | null {
-  const folder = recordingFolders.find((f) => f.id === id)
+  const folder = current().recordingFolders.find((f) => f.id === id)
   if (!folder) return null
   if (patch.name !== undefined) folder.name = patch.name.trim().slice(0, 30) || folder.name
   if (patch.lectureIds !== undefined) folder.lectureIds = uniq(patch.lectureIds)
@@ -27,6 +27,7 @@ export function updateRecordingFolder(
 }
 
 export function deleteRecordingFolder(id: string): boolean {
+  const { recordingFolders } = current()
   const i = recordingFolders.findIndex((f) => f.id === id)
   if (i < 0) return false
   recordingFolders.splice(i, 1)
@@ -35,6 +36,7 @@ export function deleteRecordingFolder(id: string): boolean {
 
 // 두 폴더 자리를 맞바꾼다. 목록 순서가 곧 화면 순서다.
 export function swapRecordingFolders(a: string, b: string): RecordingFolder[] | null {
+  const { recordingFolders } = current()
   const i = recordingFolders.findIndex((f) => f.id === a)
   const j = recordingFolders.findIndex((f) => f.id === b)
   if (i < 0 || j < 0) return null

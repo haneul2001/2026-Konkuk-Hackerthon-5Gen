@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Bell, ChevronRight, Flame, LogOut, Minus, Pencil, Plus, ShieldBan, Trophy, Zap } from 'lucide-react'
 import type { BoardPost, UserSummary } from '../../shared/types'
 import { GOAL_MAX, GOAL_MIN } from '../../shared/profile'
@@ -8,6 +9,7 @@ import { Mascot } from '../components/Mascot'
 import { Button, Card, Field, ListSkeleton, Row, Section, Sheet, Tag } from '../components/ui'
 import { cn } from '../lib/cn'
 import { timeAgo } from '../lib/time'
+import { clearToken } from '../lib/auth'
 
 // 프로필: 내 학습 기록 한눈에 보기, 이름·하루 목표 바꾸기, 내 활동(글·스터디), 차단 관리.
 // 오른쪽 위 동그란 이름 버튼으로 들어온다.
@@ -19,6 +21,7 @@ export function ProfilePage() {
   const [posts, setPosts] = useState<BoardPost[] | null>(null)
   const [blocked, setBlocked] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     api.me().then((m) => setMe({ ...m }))
@@ -190,10 +193,21 @@ export function ProfilePage() {
               <p className="flex-1 text-[15px] font-semibold">알림 설정</p>
               <Tag>준비 중</Tag>
             </li>
-            <li className="flex min-h-16 items-center gap-3 px-4 py-3 text-muted">
-              <LogOut className="size-5 shrink-0" aria-hidden />
-              <p className="flex-1 text-[15px] font-semibold">로그아웃</p>
-              <Tag>준비 중</Tag>
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  clearToken()
+                  navigate('/login', { replace: true })
+                }}
+                className="flex min-h-16 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left active:bg-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+              >
+                <LogOut className="size-5 shrink-0 text-muted" aria-hidden />
+                <span className="flex-1">
+                  <span className="block text-[15px] font-semibold">로그아웃</span>
+                  <span className="block text-[13px] text-muted">@{me.login}</span>
+                </span>
+              </button>
             </li>
           </ul>
         </Card>

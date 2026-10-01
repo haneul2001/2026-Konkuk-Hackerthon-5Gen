@@ -183,14 +183,16 @@ studyapp   : npm run server   (3001)
 
 ## Express 상태 저장소 (`app/store.py`)
 
-Express가 메모리에 들고 있던 것(게시판 글·댓글·공감·차단·신고, 개념 폴더, 녹음 폴더·태그, XP·리그·하루 목표, 오늘 복습·오답 기록)을 이 서버 DB의 `app_state` 테이블에 둔다. 키마다 JSON 한 덩어리다(정식 테이블 아님. 로그인을 붙여 사용자별로 나눌 때 옮긴다).
+Express가 메모리에 들고 있던 것을 이 서버 DB에 둔다. 로그인·게시판·폴더 로직은 그대로 Express(TypeScript)에 있고, 여기는 저장만 한다.
 
-| API | 하는 일 |
-| --- | --- |
-| `GET /api/store` | 저장된 것 전부 `{ key: value }`. 처음엔 `{}` |
-| `PUT /api/store` | `{ key: value }`를 통째로 저장(덮어쓰기). 키는 영문·숫자·밑줄 64자 이내 |
+| 테이블 | API | 하는 일 |
+| --- | --- | --- |
+| `app_users` | `POST /api/store/users` | 가입. `{ id, login, name, passwordHash }`. 아이디가 있으면 409 |
+| | `GET /api/store/users/{login}` | 로그인 확인용. 비밀번호 해시(scrypt, Express가 만듦)까지 돌려준다. 없으면 404 |
+| `app_state` | `GET /api/store` | 저장된 상태 전부 `{ key: value }`. 처음엔 `{}` |
+| | `PUT /api/store` | `{ key: value }`를 저장(덮어쓰기). 키는 영문·숫자·밑줄 64자 이내 |
 
-- Express(`server/persist.ts`)가 켜질 때 한 번 불러오고, GET이 아닌 요청이 성공할 때마다 300ms 모아서 통째로 저장한다.
-- 켜는 순서는 AI 서버 → Express. Express가 먼저 켜지면 5초마다 다시 시도하고, 연결 전엔 저장하지 않는다.
-- 키: `me`, `league`, `todayReviews`, `wrongAnswers`, `posts`, `comments`, `studyContacts`, `board`(참여·차단·신고), `folders`, `recordingFolders`, `recordingTagList`, `lectureTags`.
-
+- `app_state`는 키마다 JSON 한 덩어리다. 공용 키: `posts`, `comments`, `studyContacts`, `reports`. 사용자별 키: `user_<사용자 id>`(내 기록·XP·폴더·녹음 폴더·태그·오늘 복습·오답·스터디 참여·차단).
+- Express(`server/persist.ts`)가 켜질 때 전부 불러오고(연결될 때까지 5초마다 재시도), GET이 아닌 요청이 성공할 때마다 300ms 모아서 공용 키 + 바뀐 사용자 키를 저장한다. 꺼질 때(SIGTERM)는 남은 변경을 저장하고 끝낸다.
+- 켜는 순서는 AI 서버 → Express. 연결 전엔 저장하지 않는다.
+- 이 서버의 다른 API(플래시카드 상자, 숙련도, 오답 횟수)는 아직 사용자별이 아니다. Express가 모든 요청에 사용자를 알고 있으니(`req.user.me.id`), 나누려면 헤더(예: `X-User-Id`)로 넘기고 여기서 `user_id`로 쓰면 된다.

@@ -1,10 +1,12 @@
-import { lectures, localDate, me, posts, todayReviews } from './mock'
+import { lectures, localDate, posts } from './mock'
+import { current } from './session'
 import { currentStreak, daysSinceStudy, solvedToday } from './mood'
 import type { Notice } from './types'
 
 // 앱을 열었을 때 보여줄 알림. 중요한 순서대로 돌려준다.
 // 지금은 앱 안 배너로만 띄우고, 나중에 푸시 알림이 붙으면 같은 규칙을 쓴다.
 export function currentNotices(): Notice[] {
+  const { me, todayReviews } = current()
   const out: Notice[] = []
   const today = localDate()
   const days = daysSinceStudy(me, today)
@@ -70,6 +72,7 @@ export function absenceNotice(days: number): Notice {
 
 // 문제를 제출한 직후 생기는 알림: 오늘 목표 달성, 새로 참여할 수 있게 된 스터디.
 export function noticesAfterSubmit(before: { solved: number; xpTotal: number }): Notice[] {
+  const { me } = current()
   const out: Notice[] = []
   const today = localDate()
   const solved = solvedToday(me, today)

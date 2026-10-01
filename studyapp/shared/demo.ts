@@ -1,46 +1,33 @@
-import { comments, league, localDate, me, posts, studyContacts } from './mock'
+import { comments, posts, studyContacts } from './mock'
 import type { BoardComment, BoardPost } from './types'
 
-// 시연·테스트용 더미 데이터. DEMO_SEED=1 일 때만 서버가 켜질 때 한 번 채운다.
-// 로그인이 없어 다른 사용자는 리그·게시판에만 나오는 가짜 사람이다. 서버를 다시 켜면 이 상태로 돌아간다.
+// 시연·테스트용 더미 데이터. DEMO_SEED=1 일 때만 쓴다.
+//  - 리그 상대 7명: 리그에만 나오는 가상 사용자. 로그인은 못 한다 (session.setLeagueOpponents)
+//  - 게시글 5개·댓글 4개: 저장된 글이 하나도 없을 때 한 번만 채운다. 그 뒤로는 DB에 남는다
+// 로그인이 생겨서 '내 기록'은 더 이상 채우지 않는다. 가입한 사용자가 직접 쌓는다.
 
-const others = [
-  { id: 'u_jiwoo', name: '지우', xp: 410 },
-  { id: 'u_minjun', name: '민준', xp: 265 },
-  { id: 'u_seoyeon', name: '서연', xp: 198 },
-  { id: 'u_doyun', name: '도윤', xp: 150 },
-  { id: 'u_harin', name: '하린', xp: 92 },
-  { id: 'u_junho', name: '준호', xp: 60 },
-  { id: 'u_yuna', name: '유나', xp: 35 },
+export const DEMO_OPPONENTS = [
+  { name: '지우', xpThisWeek: 410 },
+  { name: '민준', xpThisWeek: 265 },
+  { name: '서연', xpThisWeek: 198 },
+  { name: '도윤', xpThisWeek: 150 },
+  { name: '하린', xpThisWeek: 92 },
+  { name: '준호', xpThisWeek: 60 },
+  { name: '유나', xpThisWeek: 35 },
 ]
 
 // 지금으로부터 h시간 전
 const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
 
-export function seedDemo() {
-  // 내 기록: 어제까지 5일 연속, 오늘 4문제 푼 상태
-  Object.assign(me, {
-    xpTotal: 1240,
-    xpThisWeek: 180,
-    streakDays: 5,
-    lastStudyDate: localDate(),
-    todaySolved: 4,
-  })
+// 글이 비어 있을 때만 채운다. 채웠으면 true
+export function seedDemoPosts(): boolean {
+  if (posts.length > 0) return false
 
-  // 주간 리그: 나 + 7명, XP 순으로 순위
-  league.length = 0
-  league.push(
-    { rank: 0, name: me.name, xpThisWeek: me.xpThisWeek, isMe: true },
-    ...others.map((u) => ({ rank: 0, name: u.name, xpThisWeek: u.xp })),
-  )
-  league.sort((a, b) => b.xpThisWeek - a.xpThisWeek)
-  league.forEach((e, i) => (e.rank = i + 1))
-  me.leagueRank = league.find((e) => e.isMe)!.rank
-  me.leagueSize = league.length
-
-  // 게시판
-  const post = (p: Omit<BoardPost, 'likes' | 'liked' | 'commentCount' | 'anonymous' | 'author'> &
-    Partial<Pick<BoardPost, 'likes' | 'anonymous'>>, name: string): BoardPost => ({
+  const post = (
+    p: Omit<BoardPost, 'likes' | 'liked' | 'commentCount' | 'anonymous' | 'author'> &
+      Partial<Pick<BoardPost, 'likes' | 'anonymous'>>,
+    name: string,
+  ): BoardPost => ({
     likes: 0,
     anonymous: false,
     ...p,
@@ -86,4 +73,5 @@ export function seedDemo() {
       body: 'XP 조금만 더 모으면 참여할게요!', createdAt: ago(25) }),
   )
   for (const p of posts) p.commentCount = comments.filter((c) => c.postId === p.id).length
+  return true
 }

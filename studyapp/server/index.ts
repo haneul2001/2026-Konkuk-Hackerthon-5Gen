@@ -23,7 +23,7 @@ import {
   updatePost,
 } from '../shared/board'
 import { updateProfile } from '../shared/profile'
-import { isLoaded, loadState, scheduleSave } from './persist'
+import { flushSave, isLoaded, loadState, scheduleSave } from './persist'
 import { createFolder, deleteFolder, swapFolders, updateFolder } from '../shared/folders'
 import {
   createRecordingFolder,
@@ -33,10 +33,11 @@ import {
 } from '../shared/recordingFolders'
 import { addTag, removeTag, setLectureTags, tagState } from '../shared/recordingTags'
 import { currentNotices } from '../shared/notices'
-import { folders, league, me, recordingFolders, todayReviews } from '../shared/mock'
+import { current, refreshLeague, setLeagueOpponents } from '../shared/session'
 import { submitQuiz, type GradedResult } from '../shared/quiz'
 import { finishCardSet } from '../shared/cards'
-import { seedDemo } from '../shared/demo'
+import { DEMO_OPPONENTS, seedDemoPosts } from '../shared/demo'
+import { login, requireAuth, signup } from './auth'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
 // XP·리그·연속 학습일·오늘 복습·폴더·게시판은 여기서 목 데이터로 처리한다.
@@ -45,19 +46,16 @@ import { seedDemo } from '../shared/demo'
 
 const AI = process.env.AI_SERVER ?? 'http://localhost:8000'
 
-// 시연용 더미 데이터(리그 상대·게시글·내 기록). Render 환경변수 DEMO_SEED=1 일 때만
-if (process.env.DEMO_SEED === '1') seedDemo()
-
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-// 상태 저장: GET이 아닌 요청이 성공하면(여기서 처리한 것이든 AI 서버로 넘긴 것이든) 잠깐 뒤 통째로 저장한다.
+// 상태 저장: GET이 아닌 요청이 성공하면 잠깐 뒤 공용 상태와 그 사용자 상태를 저장한다.
 // 어떤 요청이 무엇을 바꿨는지 따지지 않아도 되게 단순하게 둔다. 저장은 300ms 모아서 한 번.
 app.use((req, res, next) => {
   if (req.method !== 'GET') {
     res.on('finish', () => {
-      if (res.statusCode < 400) scheduleSave()
+      if (res.statusCode < 400) scheduleSave(req.user?.me.id)
     })
   }
   next()
@@ -97,8 +95,43 @@ async function forward(req: express.Request, res: express.Response, body?: unkno
   }
 }
 
+// ---- 상태 확인 (Render 헬스 체크, 로그인 없이) ----
+// AI 서버가 꺼져 있어도 Express는 살아 있으니 200. ai 항목으로 AI 서버 연결 여부를 알려준다.
+app.get('/api/health', async (_req, res) => {
+  let ai = false
+  try {
+    ai = (await fetch(`${AI}/health`, { signal: AbortSignal.timeout(3000) })).ok
+  } catch {
+    // AI 서버 꺼짐
+  }
+  // store: AI 서버 DB에서 상태를 불러왔는지. false면 바뀐 게 저장되지 않는다
+  res.json({ ok: true, ai, store: isLoaded() })
+})
+
+// ---- 로그인 (로그인 없이) ----
+// 사용자는 AI 서버 DB(app_users)에, 토큰은 서명으로 확인한다. 자세한 건 server/auth.ts
+app.post('/api/auth/signup', async (req, res) => {
+  // body: { login, password, name } → { token, user }
+  const r = await signup(req.body ?? {})
+  if ('error' in r) return res.status(r.status).json({ error: r.error })
+  scheduleSave(r.user.id)
+  res.json(r)
+})
+app.post('/api/auth/login', async (req, res) => {
+  // body: { login, password } → { token, user }
+  const r = await login(req.body ?? {})
+  if ('error' in r) return res.status(r.status).json({ error: r.error })
+  res.json(r)
+})
+
+// 여기부터는 전부 로그인 필요. 토큰의 사용자 상태가 이 요청의 current()가 된다.
+app.use('/api', requireAuth)
+
 // ---- 홈 ----
-app.get('/api/me', (_req, res) => res.json(me))
+app.get('/api/me', (_req, res) => {
+  refreshLeague()
+  res.json(current().me)
+})
 // 프로필: 이름·하루 목표 바꾸기, 차단 관리
 app.patch('/api/me', (req, res) => {
   // body: { name?, dailyGoal? }
@@ -108,8 +141,8 @@ app.patch('/api/me', (req, res) => {
 })
 app.get('/api/blocks', (_req, res) => res.json(blockedCount()))
 app.delete('/api/blocks', (_req, res) => res.json(unblockAll()))
-app.get('/api/reviews/today', (_req, res) => res.json(todayReviews))
-app.get('/api/league', (_req, res) => res.json(league))
+app.get('/api/reviews/today', (_req, res) => res.json(current().todayReviews))
+app.get('/api/league', (_req, res) => res.json(refreshLeague()))
 
 // ---- 녹음·요약·개념 (AI 서버) ----
 // 업로드(multipart: audio, course, title?, recordedAt?) → 전처리 → STT → 요약 → 개념.
@@ -146,7 +179,7 @@ app.put('/api/recording-tags/lectures/:id', (req, res) => {
 })
 
 // 녹음 폴더: 개념 폴더와 같은 방식으로 녹음(강의)을 담는다.
-app.get('/api/recording-folders', (_req, res) => res.json(recordingFolders))
+app.get('/api/recording-folders', (_req, res) => res.json(current().recordingFolders))
 app.post('/api/recording-folders', (req, res) => {
   // body: { name, lectureIds? }
   res.json(createRecordingFolder(String(req.body?.name ?? ''), req.body?.lectureIds ?? []))
@@ -166,7 +199,7 @@ app.patch('/api/recording-folders/:id', (req, res) => {
 app.delete('/api/recording-folders/:id', (req, res) => {
   res.json(deleteRecordingFolder(req.params.id))
 })
-app.get('/api/folders', (_req, res) => res.json(folders))
+app.get('/api/folders', (_req, res) => res.json(current().folders))
 app.post('/api/folders', (req, res) => {
   // body: { name, conceptIds? }
   res.json(createFolder(String(req.body?.name ?? ''), req.body?.conceptIds ?? []))
@@ -199,7 +232,7 @@ app.post('/api/quiz', (req, res) => {
   // body: { source: { kind: 'lecture' | 'folder', id }, type, count }
   const { source } = req.body ?? {}
   if (source?.kind === 'folder') {
-    const folder = folders.find((f) => f.id === source.id)
+    const folder = current().folders.find((f) => f.id === source.id)
     if (!folder) return res.status(404).json({ error: '폴더를 찾을 수 없어요' })
     return forward(req, res, {
       ...req.body,
@@ -211,7 +244,7 @@ app.post('/api/quiz', (req, res) => {
 })
 // 오늘 복습 목록은 여기서 관리하고, 문제는 AI 서버에 저장된 것에서 낸다.
 app.post('/api/reviews/:id/quiz', (req, res) => {
-  const review = todayReviews.find((r) => r.id === req.params.id)
+  const review = current().todayReviews.find((r) => r.id === req.params.id)
   if (!review) return res.json(null)
   forward(req, res, { lectureId: review.lectureId, reason: review.reason, count: review.questionCount })
 })
@@ -342,19 +375,6 @@ app.post('/api/posts/:id/join', (req, res) => {
   res.json(post)
 })
 
-// ---- 상태 확인 (Render 헬스 체크) ----
-// AI 서버가 꺼져 있어도 Express는 살아 있으니 200. ai 항목으로 AI 서버 연결 여부를 알려준다.
-app.get('/api/health', async (_req, res) => {
-  let ai = false
-  try {
-    ai = (await fetch(`${AI}/health`, { signal: AbortSignal.timeout(3000) })).ok
-  } catch {
-    // AI 서버 꺼짐
-  }
-  // store: AI 서버 DB에서 상태를 불러왔는지. false면 바뀐 게 저장되지 않는다
-  res.json({ ok: true, ai, store: isLoaded() })
-})
-
 // ---- 배포: 빌드된 화면(dist)도 여기서 내보낸다 ----
 // Render 한 곳에서 화면과 API를 같은 주소로 띄우기 위해서다. 개발 중엔 dist가 없어도 되고 Vite(5173)를 쓴다.
 const DIST = fileURLToPath(new URL('../dist', import.meta.url))
@@ -370,5 +390,19 @@ if (existsSync(DIST)) {
 const PORT = Number(process.env.PORT) || 3001
 app.listen(PORT, () => {
   console.log(`API server on http://localhost:${PORT} (AI 서버: ${AI})`)
-  void loadState() // 게시판·폴더·XP 등을 AI 서버 DB에서 불러온다
+  // 사용자·게시판·폴더 등을 AI 서버 DB에서 불러온다. 연결될 때까지 기다린다
+  void loadState().then(() => {
+    // 시연용 더미(DEMO_SEED=1): 리그 가상 상대 7명 + 글이 하나도 없으면 게시글 5개
+    if (process.env.DEMO_SEED === '1') {
+      setLeagueOpponents(DEMO_OPPONENTS)
+      if (seedDemoPosts()) scheduleSave()
+    }
+  })
 })
+
+// 꺼질 때 모아 둔 변경을 저장하고 끝낸다 (Render 재배포·잠들기는 SIGTERM을 보낸다)
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    flushSave().finally(() => process.exit(0))
+  })
+}

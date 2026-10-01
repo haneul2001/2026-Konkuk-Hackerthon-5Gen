@@ -1,4 +1,5 @@
-import { concepts, folders, league, lectures, localDate, me, todayReviews } from './mock'
+import { concepts, lectures, localDate } from './mock'
+import { current, refreshLeague } from './session'
 import { daysSinceStudy, solvedToday } from './mood'
 import { noticesAfterSubmit } from './notices'
 import { quizBank } from './quizBank'
@@ -14,7 +15,7 @@ import type {
 
 // 퀴즈 만들기·채점·결과 반영. 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
 // 출제 기준은 "개념 묶음": 강의의 개념 전체, 또는 사용자가 만든 폴더의 개념.
-// 상태는 메모리의 목 데이터를 직접 고친다. DB가 붙으면 반영 부분만 바꾸면 된다.
+// 내 기록·오답·복습은 로그인한 사용자의 상태(current())를 고친다. 서버가 AI 서버 DB에 저장한다.
 
 export const XP_PER_CORRECT = 10
 export const XP_PER_CARD = 1 // 플래시카드 한 세트를 끝까지 넘기면 카드 수만큼
@@ -25,13 +26,10 @@ export function cardSetXp(cardCount: number) {
 
 // XP를 더하고 리그 순위를 다시 매긴다.
 export function addXp(xp: number) {
+  const { me } = current()
   me.xpTotal += xp
   me.xpThisWeek += xp
-  const mine = league.find((e) => e.isMe)
-  if (mine) mine.xpThisWeek = me.xpThisWeek
-  league.sort((a, b) => b.xpThisWeek - a.xpThisWeek)
-  league.forEach((e, i) => (e.rank = i + 1))
-  if (mine) me.leagueRank = mine.rank
+  refreshLeague()
 }
 
 // 문제 은행을 평평하게 펴고, 문제 → 강의 연결을 기억해 둔다(오답·복습은 강의 단위라서).
@@ -40,22 +38,8 @@ const lectureOf = new Map<string, string>(
   Object.entries(quizBank).flatMap(([lectureId, qs]) => qs.map((q) => [q.id, lectureId] as const)),
 )
 
-// 오답 기록: 강의 id → 틀린 문제 id. 홈의 "오늘 복습(틀린 문제)"이 여기서 나온다.
-// 처음엔 비어 있고, 퀴즈를 풀다 틀리면 생긴다.
-const wrongByLecture = new Map<string, Set<string>>()
-
-// 저장소(server/persist.ts)용: { 강의 id: 틀린 문제 id[] }
-export function exportWrongAnswers(): Record<string, string[]> {
-  return Object.fromEntries([...wrongByLecture].map(([k, v]) => [k, [...v]]))
-}
-
-export function importWrongAnswers(data: unknown) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return
-  wrongByLecture.clear()
-  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
-    if (Array.isArray(v)) wrongByLecture.set(k, new Set(v.map(String)))
-  }
-}
+// 오답 기록(사용자별): 강의 id → 틀린 문제 id. 홈의 "오늘 복습(틀린 문제)"이 여기서 나온다.
+const wrongByLecture = () => current().wrongAnswers
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -92,7 +76,7 @@ export function scopeOf(source: QuizSource): { title: string; conceptIds: string
     }
   }
   if (source.kind === 'folder') {
-    const folder = folders.find((f) => f.id === source.id)
+    const folder = current().folders.find((f) => f.id === source.id)
     if (!folder) return null
     return { title: folder.name, conceptIds: folder.conceptIds }
   }
@@ -127,12 +111,12 @@ export function buildQuiz(
 
 // 복습 퀴즈: 틀린 문제 복습이면 오답 기록에서, 간격 복습이면 자동 채점되는 문제 중에서 고른다.
 export function buildReviewQuiz(reviewId: string): Quiz | null {
-  const review = todayReviews.find((r) => r.id === reviewId)
+  const review = current().todayReviews.find((r) => r.id === reviewId)
   if (!review) return null
   const bank = quizBank[review.lectureId] ?? []
   let questions: QuizQuestion[]
   if (review.reason === 'wrong') {
-    const wrong = wrongByLecture.get(review.lectureId) ?? new Set()
+    const wrong = wrongByLecture().get(review.lectureId) ?? new Set()
     questions = bank.filter((q) => wrong.has(q.id))
   } else {
     questions = shuffle(bank.filter((q) => q.type !== 'essay')).slice(0, review.questionCount)
@@ -174,6 +158,7 @@ export function submitQuiz(
   fromAi?: GradedResult[],
   lectureInfo?: LectureInfo,
 ): QuizSubmitResult {
+  const { me } = current()
   const lectureOfQuestion = fromAi
     ? new Map(fromAi.map((g) => [g.questionId, g.lectureId] as const))
     : lectureOf
@@ -199,18 +184,18 @@ export function submitQuiz(
 
   // 끝낸 간격 복습은 목록에서 뺀다.
   if (sub.source.kind === 'review') {
-    const i = todayReviews.findIndex((r) => r.id === sub.source.id && r.reason === 'interval')
-    if (i >= 0) todayReviews.splice(i, 1)
+    const i = current().todayReviews.findIndex((r) => r.id === sub.source.id && r.reason === 'interval')
+    if (i >= 0) current().todayReviews.splice(i, 1)
   }
 
   // 오답 기록은 강의 단위. 폴더 퀴즈는 여러 강의에 걸칠 수 있어서 문제마다 강의를 찾아 나눈다.
   const touched = new Set<string>()
   for (const r of graded) {
     const lectureId = lectureOfQuestion.get(r.questionId)!
-    const wrong = wrongByLecture.get(lectureId) ?? new Set<string>()
+    const wrong = wrongByLecture().get(lectureId) ?? new Set<string>()
     if (r.correct) wrong.delete(r.questionId)
     else wrong.add(r.questionId)
-    wrongByLecture.set(lectureId, wrong)
+    wrongByLecture().set(lectureId, wrong)
     touched.add(lectureId)
   }
   for (const lectureId of touched) syncWrongReview(lectureId, lectureInfo?.get(lectureId))
@@ -239,18 +224,18 @@ export function submitQuiz(
 
 // "틀린 문제 다시 풀기" 복습 항목을 남은 오답 수에 맞춘다.
 function syncWrongReview(lectureId: string, info?: { title: string; course: string }) {
-  const wrong = wrongByLecture.get(lectureId) ?? new Set()
-  const i = todayReviews.findIndex((r) => r.lectureId === lectureId && r.reason === 'wrong')
+  const wrong = wrongByLecture().get(lectureId) ?? new Set()
+  const i = current().todayReviews.findIndex((r) => r.lectureId === lectureId && r.reason === 'wrong')
   if (wrong.size === 0) {
-    if (i >= 0) todayReviews.splice(i, 1)
+    if (i >= 0) current().todayReviews.splice(i, 1)
     return
   }
   if (i >= 0) {
-    todayReviews[i].questionCount = wrong.size
+    current().todayReviews[i].questionCount = wrong.size
     return
   }
   const lecture = info ?? lectures.find((l) => l.id === lectureId)
-  todayReviews.unshift({
+  current().todayReviews.unshift({
     id: `rev_wrong_${lectureId}`,
     lectureId,
     lectureTitle: lecture?.title ?? '',

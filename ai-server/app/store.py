@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import JSON, DateTime, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +26,18 @@ class AppState(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[Any] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class AppUser(Base):
+    """studyapp 사용자. 비밀번호는 Express가 scrypt로 해시해서 보낸다. 이름은 Express 상태에도 있다(표시용)."""
+
+    __tablename__ = "app_users"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    login: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(32))
+    password_hash: Mapped[str] = mapped_column(String(256))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 router = APIRouter(prefix="/api/store", tags=["store"])
@@ -52,3 +65,39 @@ def write_all(body: dict[str, Any]) -> dict[str, int]:
             else:
                 row.value = value
     return {"saved": len(body)}
+
+
+# ---- 사용자 (로그인은 Express가 한다. 여기는 저장만) ----
+
+
+class UserIn(BaseModel):
+    id: str
+    login: str
+    name: str
+    passwordHash: str
+
+
+def _user_out(u: AppUser) -> dict[str, Any]:
+    return {"id": u.id, "login": u.login, "name": u.name, "passwordHash": u.password_hash}
+
+
+@router.post("/users", status_code=201)
+def create_user(body: UserIn) -> dict[str, Any]:
+    """가입. 아이디가 이미 있으면 409"""
+    with SessionLocal.begin() as db:
+        if db.scalars(select(AppUser).where(AppUser.login == body.login)).first():
+            raise HTTPException(409, "이미 있는 아이디예요")
+        u = AppUser(id=body.id, login=body.login, name=body.name, password_hash=body.passwordHash)
+        db.add(u)
+        db.flush()
+        return _user_out(u)
+
+
+@router.get("/users/{login}")
+def get_user(login: str) -> dict[str, Any]:
+    """로그인 확인용. 없으면 404"""
+    with SessionLocal() as db:
+        u = db.scalars(select(AppUser).where(AppUser.login == login)).first()
+        if not u:
+            raise HTTPException(404, "없는 아이디예요")
+        return _user_out(u)

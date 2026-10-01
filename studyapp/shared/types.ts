@@ -28,6 +28,8 @@ export type ReviewItem = {
 }
 
 export type UserSummary = {
+  id: string
+  login: string // 로그인 아이디 (못 바꾼다)
   name: string
   xpTotal: number
   xpThisWeek: number

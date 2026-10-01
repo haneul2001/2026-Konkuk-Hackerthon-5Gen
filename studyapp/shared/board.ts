@@ -1,9 +1,10 @@
-import { comments, ME_ID, me, posts, studyContacts } from './mock'
+import { comments, posts, studyContacts } from './mock'
+import { current } from './session'
 import { REPORT_REASONS } from './types'
 import type { BoardComment, BoardKind, BoardPost, NewPost, Report, ReportReason } from './types'
 
 // 게시판 글·댓글·공감·스터디 참여. 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
-// 지금 사용자는 한 명(me)이라 공감·참여 여부를 여기 바로 적는다.
+// 참여·차단은 로그인한 사용자의 상태(current())에, 공감은 글에 적는다(TODO: 사용자별 공감).
 // 저장된 글을 그대로 내보내지 않고 view()로 복사해서, 연락처는 볼 수 있는 사람에게만 붙인다.
 // 차단: 그 사람의 글은 목록에서 빠지고 댓글은 내용이 가려진다. 랭킹(리그)에는 그대로 나온다.
 
@@ -15,39 +16,24 @@ export const BOARDS: { key: BoardKind; label: string }[] = [
 
 type Fail = { error: string }
 
-const joinedByMe = new Set<string>() // 내가 참여한 스터디 글 id
-const blockedUsers = new Set<string>() // 내가 차단한 사람(authorId). 익명이어도 같은 사람이면 가린다
+// 신고는 모두의 것(관리자가 본다). 저장소(server/persist.ts)가 내보내고 들여온다.
 const reports: Report[] = []
 
-// 저장소(server/persist.ts)용. 글·댓글은 mock.ts 배열이라 따로 저장되고, 여기 것만 모은다.
-export type BoardState = { joinedByMe: string[]; blockedUsers: string[]; reports: Report[] }
-
-export function exportBoardState(): BoardState {
-  return { joinedByMe: [...joinedByMe], blockedUsers: [...blockedUsers], reports }
+export function exportReports(): Report[] {
+  return reports
 }
 
-export function importBoardState(data: unknown) {
-  const s = data as Partial<BoardState> | undefined
-  if (!s || typeof s !== 'object') return
-  if (Array.isArray(s.joinedByMe)) {
-    joinedByMe.clear()
-    for (const id of s.joinedByMe) joinedByMe.add(String(id))
-  }
-  if (Array.isArray(s.blockedUsers)) {
-    blockedUsers.clear()
-    for (const id of s.blockedUsers) blockedUsers.add(String(id))
-  }
-  if (Array.isArray(s.reports)) {
-    reports.length = 0
-    reports.push(...s.reports)
-  }
+export function importReports(data: unknown) {
+  if (!Array.isArray(data)) return
+  reports.length = 0
+  reports.push(...(data as Report[]))
 }
 
 const newest = (a: { createdAt: string }, b: { createdAt: string }) => b.createdAt.localeCompare(a.createdAt)
 
 function view(p: BoardPost): BoardPost {
-  const mine = p.authorId === ME_ID
-  const joined = joinedByMe.has(p.id)
+  const mine = p.authorId === current().me.id
+  const joined = current().joinedByMe.has(p.id)
   return {
     ...p,
     mine,
@@ -67,7 +53,7 @@ export function matches(p: BoardPost, q: string) {
 
 export function listPosts(board?: BoardKind, q = ''): BoardPost[] {
   return posts
-    .filter((p) => (!board || p.board === board) && !blockedUsers.has(p.authorId) && matches(p, q))
+    .filter((p) => (!board || p.board === board) && !current().blockedUsers.has(p.authorId) && matches(p, q))
     .sort(newest)
     .map(view)
 }
@@ -76,7 +62,7 @@ export function getPost(id: string): { post: BoardPost; comments: BoardComment[]
   const post = posts.find((p) => p.id === id)
   if (!post) return null
   // 차단한 사람 글에 주소로 들어오면 내용 없이 표시만
-  if (blockedUsers.has(post.authorId)) {
+  if (current().blockedUsers.has(post.authorId)) {
     return { post: { ...view(post), title: '', body: '', tags: [], study: undefined, blocked: true }, comments: [] }
   }
   return {
@@ -90,13 +76,13 @@ export function getPost(id: string): { post: BoardPost; comments: BoardComment[]
 
 // 댓글도 복사해서 내보낸다. 차단한 사람 댓글은 내용을 비운다.
 function viewComment(c: BoardComment): BoardComment {
-  const blocked = blockedUsers.has(c.authorId)
+  const blocked = current().blockedUsers.has(c.authorId)
   return {
     ...c,
     body: blocked ? '' : c.body,
     likes: c.likes ?? 0,
     liked: !!c.liked,
-    mine: c.authorId === ME_ID,
+    mine: c.authorId === current().me.id,
     blocked,
   }
 }
@@ -104,7 +90,7 @@ function viewComment(c: BoardComment): BoardComment {
 export function toggleCommentLike(id: string): BoardComment | Fail {
   const c = comments.find((x) => x.id === id)
   if (!c) return { error: '댓글을 찾을 수 없어요' }
-  if (c.authorId === ME_ID) return { error: '내 댓글에는 공감할 수 없어요' }
+  if (c.authorId === current().me.id) return { error: '내 댓글에는 공감할 수 없어요' }
   c.liked = !c.liked
   c.likes = (c.likes ?? 0) + (c.liked ? 1 : -1)
   return viewComment(c)
@@ -114,15 +100,15 @@ export function toggleCommentLike(id: string): BoardComment | Fail {
 export function blockCommentAuthor(id: string): { ok: true } | Fail {
   const c = comments.find((x) => x.id === id)
   if (!c) return { error: '댓글을 찾을 수 없어요' }
-  if (c.authorId === ME_ID) return { error: '나는 차단할 수 없어요' }
-  blockedUsers.add(c.authorId)
+  if (c.authorId === current().me.id) return { error: '나는 차단할 수 없어요' }
+  current().blockedUsers.add(c.authorId)
   return { ok: true }
 }
 
 export function reportComment(id: string, reason: ReportReason): { ok: true } | Fail {
   const c = comments.find((x) => x.id === id)
   if (!c) return { error: '댓글을 찾을 수 없어요' }
-  if (c.authorId === ME_ID) return { error: '내 댓글은 신고할 수 없어요' }
+  if (c.authorId === current().me.id) return { error: '내 댓글은 신고할 수 없어요' }
   if (!REPORT_REASONS.includes(reason)) return { error: '신고 사유를 골라 주세요' }
   if (reports.some((r) => r.kind === 'comment' && r.targetId === id)) return { error: '이미 신고한 댓글이에요' }
   reports.push({
@@ -143,15 +129,15 @@ export function reportComment(id: string, reason: ReportReason): { ok: true } | 
 export function blockPostAuthor(id: string): { ok: true } | Fail {
   const p = posts.find((x) => x.id === id)
   if (!p) return { error: '글을 찾을 수 없어요' }
-  if (p.authorId === ME_ID) return { error: '나는 차단할 수 없어요' }
-  blockedUsers.add(p.authorId)
+  if (p.authorId === current().me.id) return { error: '나는 차단할 수 없어요' }
+  current().blockedUsers.add(p.authorId)
   return { ok: true }
 }
 
 export function reportPost(id: string, reason: ReportReason): { ok: true } | Fail {
   const p = posts.find((x) => x.id === id)
   if (!p) return { error: '글을 찾을 수 없어요' }
-  if (p.authorId === ME_ID) return { error: '내 글은 신고할 수 없어요' }
+  if (p.authorId === current().me.id) return { error: '내 글은 신고할 수 없어요' }
   if (!REPORT_REASONS.includes(reason)) return { error: '신고 사유를 골라 주세요' }
   if (reports.some((r) => r.kind === 'post' && r.targetId === id)) return { error: '이미 신고한 글이에요' }
   reports.push({
@@ -170,10 +156,10 @@ export function reportPost(id: string, reason: ReportReason): { ok: true } | Fai
 
 // 프로필: 차단한 사람 수, 모두 해제
 export function blockedCount() {
-  return { count: blockedUsers.size }
+  return { count: current().blockedUsers.size }
 }
 export function unblockAll() {
-  blockedUsers.clear()
+  current().blockedUsers.clear()
   return { count: 0 }
 }
 
@@ -232,8 +218,8 @@ export function createPost(input: NewPost): BoardPost | Fail {
     body: v.body,
     tags: v.tags,
     anonymous: v.anonymous,
-    author: v.anonymous ? '익명' : me.name,
-    authorId: ME_ID,
+    author: v.anonymous ? '익명' : current().me.name,
+    authorId: current().me.id,
     likes: 0,
     liked: false,
     commentCount: 0,
@@ -249,14 +235,14 @@ export function createPost(input: NewPost): BoardPost | Fail {
 export function updatePost(id: string, input: Omit<NewPost, 'board'>): BoardPost | Fail {
   const post = posts.find((p) => p.id === id)
   if (!post) return { error: '글을 찾을 수 없어요' }
-  if (post.authorId !== ME_ID) return { error: '내가 쓴 글만 고칠 수 있어요' }
+  if (post.authorId !== current().me.id) return { error: '내가 쓴 글만 고칠 수 있어요' }
   const v = validate({ ...input, board: post.board }, Math.max(2, post.study?.joined ?? 0))
   if ('error' in v) return v
   post.title = v.title
   post.body = v.body
   post.tags = v.tags
   post.anonymous = v.anonymous
-  post.author = v.anonymous ? '익명' : me.name
+  post.author = v.anonymous ? '익명' : current().me.name
   post.editedAt = new Date().toISOString()
   if (post.study && v.study) {
     post.study = { ...post.study, course: v.study.course, minXp: v.study.minXp, capacity: v.study.capacity }
@@ -268,10 +254,10 @@ export function updatePost(id: string, input: Omit<NewPost, 'board'>): BoardPost
 export function deletePost(id: string): { ok: true } | Fail {
   const i = posts.findIndex((p) => p.id === id)
   if (i < 0) return { error: '글을 찾을 수 없어요' }
-  if (posts[i].authorId !== ME_ID) return { error: '내가 쓴 글만 지울 수 있어요' }
+  if (posts[i].authorId !== current().me.id) return { error: '내가 쓴 글만 지울 수 있어요' }
   posts.splice(i, 1)
   for (let j = comments.length - 1; j >= 0; j--) if (comments[j].postId === id) comments.splice(j, 1)
-  joinedByMe.delete(id)
+  current().joinedByMe.delete(id)
   delete studyContacts[id]
   return { ok: true }
 }
@@ -288,12 +274,13 @@ export function toggleLike(id: string): BoardPost | null {
 export function joinPost(id: string): BoardPost | Fail {
   const post = posts.find((p) => p.id === id)
   if (!post?.study) return { error: '스터디 모집 글이 아니에요' }
-  if (post.authorId === ME_ID || joinedByMe.has(id)) return view(post) // 이미 들어가 있음
+  if (post.authorId === current().me.id || current().joinedByMe.has(id)) return view(post) // 이미 들어가 있음
   const s = post.study
   if (s.joined >= s.capacity) return { error: '모집이 끝났어요' }
+  const { me } = current()
   if (me.xpTotal < s.minXp) return { error: `XP가 ${(s.minXp - me.xpTotal).toLocaleString()} 더 필요해요` }
   s.joined += 1
-  joinedByMe.add(id)
+  current().joinedByMe.add(id)
   return view(post)
 }
 
@@ -317,12 +304,12 @@ export function addComment(
     rootId = parent.parentId ?? parent.id
   }
 
-  const isWriter = post.authorId === ME_ID
+  const isWriter = post.authorId === current().me.id
   let author: string
-  if (isWriter) author = `${anonymous ? '익명' : me.name}(글쓴이)`
-  else if (!anonymous) author = me.name
+  if (isWriter) author = `${anonymous ? '익명' : current().me.name}(글쓴이)`
+  else if (!anonymous) author = current().me.name
   else {
-    const mine = comments.find((c) => c.postId === postId && c.authorId === ME_ID && /^익명\d+$/.test(c.author))
+    const mine = comments.find((c) => c.postId === postId && c.authorId === current().me.id && /^익명\d+$/.test(c.author))
     const used = new Set(
       comments.filter((c) => c.postId === postId && /^익명\d+$/.test(c.author)).map((c) => c.authorId),
     )
@@ -334,7 +321,7 @@ export function addComment(
     postId,
     body: text,
     author,
-    authorId: ME_ID,
+    authorId: current().me.id,
     isWriter,
     createdAt: new Date().toISOString(),
     parentId: rootId,

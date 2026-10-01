@@ -1,7 +1,8 @@
-import { localDate, me } from './mock'
+import { localDate } from './mock'
+import { current } from './session'
 import type { Mood, UserSummary } from './types'
 
-// 관리자(개발용): 학습 기록을 바꿔서 마스코트 기분과 알림을 확인한다. 출시 전에는 막는다.
+// 관리자(개발용): 로그인한 사용자의 학습 기록을 바꿔서 마스코트 기분과 알림을 확인한다. 출시 전에는 막는다.
 
 export type StudyRecordInput = {
   daysAgo: number // 마지막으로 공부한 날이 며칠 전인지 (0 = 오늘)
@@ -11,6 +12,7 @@ export type StudyRecordInput = {
 }
 
 export function setStudyRecord(input: StudyRecordInput): UserSummary {
+  const { me } = current()
   const daysAgo = Math.max(0, Math.min(60, Math.round(input.daysAgo)))
   if (input.dailyGoal !== undefined) me.dailyGoal = Math.max(1, Math.min(50, Math.round(input.dailyGoal)))
   me.lastStudyDate = localDate(-daysAgo)

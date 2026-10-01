@@ -1,7 +1,8 @@
-import { folders } from './mock'
+import { current } from './session'
 import type { Folder } from './types'
 
-// 개념 폴더 만들기·수정·삭제. 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
+// 개념 폴더 만들기·수정·삭제·순서 바꾸기. 로그인한 사용자의 폴더(current().folders)를 다룬다.
+// 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
 
 export function createFolder(name: string, conceptIds: string[] = []): Folder {
   const folder: Folder = {
@@ -10,7 +11,7 @@ export function createFolder(name: string, conceptIds: string[] = []): Folder {
     conceptIds: validIds(conceptIds),
     createdAt: new Date().toISOString().slice(0, 10),
   }
-  folders.push(folder)
+  current().folders.push(folder)
   return folder
 }
 
@@ -18,7 +19,7 @@ export function updateFolder(
   id: string,
   patch: { name?: string; conceptIds?: string[] },
 ): Folder | null {
-  const folder = folders.find((f) => f.id === id)
+  const folder = current().folders.find((f) => f.id === id)
   if (!folder) return null
   if (patch.name !== undefined) folder.name = patch.name.trim().slice(0, 30) || folder.name
   if (patch.conceptIds !== undefined) folder.conceptIds = validIds(patch.conceptIds)
@@ -26,6 +27,7 @@ export function updateFolder(
 }
 
 export function deleteFolder(id: string): boolean {
+  const { folders } = current()
   const i = folders.findIndex((f) => f.id === id)
   if (i < 0) return false
   folders.splice(i, 1)
@@ -34,6 +36,7 @@ export function deleteFolder(id: string): boolean {
 
 // 두 폴더 자리를 맞바꾼다. 목록 순서가 곧 화면 순서다.
 export function swapFolders(a: string, b: string): Folder[] | null {
+  const { folders } = current()
   const i = folders.findIndex((f) => f.id === a)
   const j = folders.findIndex((f) => f.id === b)
   if (i < 0 || j < 0) return null

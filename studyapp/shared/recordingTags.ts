@@ -1,6 +1,6 @@
-import { lectureTags, recordingTagList } from './mock'
+import { current } from './session'
 
-// 녹음에 다는 내 태그. 과목과 달리 사용자가 마음대로 만들고 지운다.
+// 녹음에 다는 내 태그. 과목과 달리 사용자가 마음대로 만들고 지운다. 사용자별이다.
 // 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
 
 export type RecordingTagState = {
@@ -9,6 +9,7 @@ export type RecordingTagState = {
 }
 
 export function tagState(): RecordingTagState {
+  const { recordingTagList, lectureTags } = current()
   return { tags: [...recordingTagList], byLecture: structuredClone(lectureTags) }
 }
 
@@ -18,6 +19,7 @@ export function cleanTag(name: string) {
 }
 
 export function addTag(name: string): RecordingTagState | { error: string } {
+  const { recordingTagList } = current()
   const tag = cleanTag(name)
   if (!tag) return { error: '태그 이름을 써 주세요' }
   if (recordingTagList.includes(tag)) return { error: '이미 있는 태그예요' }
@@ -28,6 +30,7 @@ export function addTag(name: string): RecordingTagState | { error: string } {
 
 // 태그를 지우면 달려 있던 녹음에서도 빠진다.
 export function removeTag(name: string): RecordingTagState {
+  const { recordingTagList, lectureTags } = current()
   const i = recordingTagList.indexOf(name)
   if (i >= 0) recordingTagList.splice(i, 1)
   for (const id of Object.keys(lectureTags)) {
@@ -39,6 +42,7 @@ export function removeTag(name: string): RecordingTagState {
 
 // 녹음 하나의 태그를 통째로 바꾼다. 처음 보는 태그는 목록에도 추가한다.
 export function setLectureTags(lectureId: string, tags: string[]): RecordingTagState {
+  const { recordingTagList, lectureTags } = current()
   const clean = [...new Set(tags.map(cleanTag).filter(Boolean))]
   for (const t of clean) if (!recordingTagList.includes(t)) recordingTagList.push(t)
   if (clean.length) lectureTags[lectureId] = clean

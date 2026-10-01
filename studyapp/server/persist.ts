@@ -1,56 +1,27 @@
-import {
-  comments,
-  folders,
-  league,
-  lectureTags,
-  me,
-  posts,
-  recordingFolders,
-  recordingTagList,
-  studyContacts,
-  todayReviews,
-} from '../shared/mock'
-import { exportBoardState, importBoardState } from '../shared/board'
-import { exportWrongAnswers, importWrongAnswers } from '../shared/quiz'
+import { comments, posts, studyContacts } from '../shared/mock'
+import { exportReports, importReports } from '../shared/board'
+import { deserializeUser, serializeUser, users } from '../shared/session'
 
 // Express 상태를 AI 서버 DB(app_state 테이블)에 저장한다.
-//  - 켜질 때: GET /api/store 로 전부 불러와 메모리 배열·객체를 그 자리에서 채운다
-//    (shared/*.ts가 배열을 import해서 쓰므로 새 배열로 바꾸지 않고 안을 갈아 끼운다)
-//  - 바뀔 때: 서버가 GET이 아닌 요청을 처리할 때마다 잠깐 모았다가 PUT /api/store 로 통째로 저장한다
-// AI 서버에 아직 연결되기 전에는 저장하지 않는다. 연결되면 DB 내용이 메모리를 덮는다.
-// (그 사이 바꾼 건 잃는다. Express는 AI 서버 뒤에 켜는 게 맞다.)
+//  - 공용(모두가 보는 것): posts, comments, studyContacts, reports → 키 하나씩
+//  - 사용자별: user_<사용자 id> → 그 사람의 상태 전부(내 기록·폴더·태그·복습·참여·차단)
+//  - 켜질 때: GET /api/store 로 전부 불러온다. 실패하면 연결될 때까지 5초마다 다시 시도
+//  - 바뀔 때: 요청이 끝나면 300ms 모았다가 공용 키 + 바뀐 사용자 키만 PUT /api/store
+// 불러오기 전에는 저장하지 않는다. 연결되면 DB 내용이 메모리를 덮는다 (Express는 AI 서버 뒤에 켠다).
 
 const AI = process.env.AI_SERVER ?? 'http://localhost:8000'
 const SAVE_DELAY_MS = 300
 const RETRY_MS = 5000
-
-type Snapshot = Record<string, unknown>
+const USER_PREFIX = 'user_'
 
 let loaded = false
 let timer: ReturnType<typeof setTimeout> | null = null
 let saving = false
 let pending = false
+const dirtyUsers = new Set<string>()
 
 export function isLoaded() {
   return loaded
-}
-
-// 저장할 모양으로 모은다
-function snapshot(): Snapshot {
-  return {
-    me,
-    league,
-    todayReviews,
-    posts,
-    comments,
-    studyContacts,
-    folders,
-    recordingFolders,
-    recordingTagList,
-    lectureTags,
-    board: exportBoardState(),
-    wrongAnswers: exportWrongAnswers(),
-  }
 }
 
 function fill<T>(target: T[], value: unknown) {
@@ -66,63 +37,90 @@ function fillRecord(target: Record<string, unknown>, value: unknown) {
 }
 
 // 불러온 것을 메모리에 그 자리에서 채운다. 모양이 이상한 키는 건너뛴다.
-function restore(data: Snapshot) {
-  if (data.me && typeof data.me === 'object') Object.assign(me, data.me)
-  fill(league, data.league)
-  fill(todayReviews, data.todayReviews)
+function restore(data: Record<string, unknown>) {
   fill(posts, data.posts)
   fill(comments, data.comments)
   fillRecord(studyContacts, data.studyContacts)
-  fill(folders, data.folders)
-  fill(recordingFolders, data.recordingFolders)
-  fill(recordingTagList, data.recordingTagList)
-  fillRecord(lectureTags, data.lectureTags)
-  importBoardState(data.board)
-  importWrongAnswers(data.wrongAnswers)
-  // 리그에 내가 없으면(처음) 넣는다. 이름은 프로필에서 바꾼 것을 따른다
-  const mine = league.find((e) => e.isMe)
-  if (!mine) league.push({ rank: 1, name: me.name, xpThisWeek: me.xpThisWeek, isMe: true })
-}
-
-export async function loadState(): Promise<void> {
-  try {
-    const r = await fetch(`${AI}/api/store`, { signal: AbortSignal.timeout(5000) })
-    if (!r.ok) throw new Error(String(r.status))
-    const data = (await r.json()) as Snapshot
-    restore(data)
-    loaded = true
-    const keys = Object.keys(data).length
-    console.log(keys ? `상태 불러옴 (${keys}개 항목)` : '저장된 상태 없음. 비어 있는 채로 시작')
-    if (pending) scheduleSave() // 불러오기 전에 바뀐 게 있으면 지금 상태를 저장
-  } catch {
-    console.warn(`AI 서버(${AI})에서 상태를 못 불러옴. ${RETRY_MS / 1000}초 뒤 다시 시도. 그동안은 저장하지 않음`)
-    setTimeout(loadState, RETRY_MS).unref()
+  importReports(data.reports)
+  for (const [key, value] of Object.entries(data)) {
+    if (!key.startsWith(USER_PREFIX)) continue
+    const state = deserializeUser(value)
+    if (state) users.set(state.me.id, state)
   }
 }
 
-// 바뀐 뒤 잠깐 모아서 한 번에 저장. 저장 중에 또 바뀌면 끝나고 한 번 더.
-export function scheduleSave() {
-  pending = true
-  if (!loaded || timer) return
-  timer = setTimeout(async () => {
-    timer = null
-    if (saving) return
-    saving = true
-    pending = false
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms).unref())
+
+// 연결될 때까지 기다렸다가 불러온다. 성공해야 끝난다.
+export async function loadState(): Promise<void> {
+  let warned = false
+  for (;;) {
     try {
-      const r = await fetch(`${AI}/api/store`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(snapshot()),
-        signal: AbortSignal.timeout(10000),
-      })
+      const r = await fetch(`${AI}/api/store`, { signal: AbortSignal.timeout(5000) })
       if (!r.ok) throw new Error(String(r.status))
-    } catch (e) {
-      console.warn('상태 저장 실패. 다음에 바뀔 때 다시 저장:', e instanceof Error ? e.message : e)
-      pending = true
-    } finally {
-      saving = false
-      if (pending) scheduleSave()
+      const data = (await r.json()) as Record<string, unknown>
+      restore(data)
+      loaded = true
+      console.log(`상태 불러옴: 사용자 ${users.size}명, 글 ${posts.length}개`)
+      if (pending || dirtyUsers.size) scheduleSave() // 불러오기 전에 바뀐 게 있으면 지금 저장
+      return
+    } catch {
+      if (!warned) {
+        console.warn(`AI 서버(${AI})에서 상태를 못 불러옴. ${RETRY_MS / 1000}초마다 다시 시도. 그동안은 저장하지 않음`)
+        warned = true
+      }
+      await sleep(RETRY_MS)
     }
+  }
+}
+
+// 바뀐 뒤 잠깐 모아서 한 번에 저장. userId를 주면 그 사용자 상태도 같이.
+export function scheduleSave(userId?: string) {
+  pending = true
+  if (userId) dirtyUsers.add(userId)
+  if (!loaded || timer) return
+  timer = setTimeout(() => {
+    timer = null
+    void saveNow()
   }, SAVE_DELAY_MS)
+}
+
+async function saveNow() {
+  if (saving || !loaded) return
+  saving = true
+  pending = false
+  const ids = [...dirtyUsers]
+  dirtyUsers.clear()
+  const body: Record<string, unknown> = { posts, comments, studyContacts, reports: exportReports() }
+  for (const id of ids) {
+    const s = users.get(id)
+    if (s) body[USER_PREFIX + id] = serializeUser(s)
+  }
+  try {
+    const r = await fetch(`${AI}/api/store`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!r.ok) throw new Error(String(r.status))
+  } catch (e) {
+    console.warn('상태 저장 실패. 다음에 바뀔 때 다시 저장:', e instanceof Error ? e.message : e)
+    pending = true
+    for (const id of ids) dirtyUsers.add(id)
+  } finally {
+    saving = false
+    if (pending) scheduleSave()
+  }
+}
+
+// 서버가 꺼질 때(Render 재배포·잠들기, Ctrl+C): 모아 둔 변경을 바로 저장하고 끝낸다.
+// 저장 중이면 끝나길 기다린다. 강제 종료(SIGKILL)는 못 막는다.
+export async function flushSave(): Promise<void> {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
+  for (let i = 0; i < 50 && saving; i++) await sleep(100)
+  if (pending || dirtyUsers.size) await saveNow()
 }

@@ -31,6 +31,8 @@ import * as profile from '../../shared/profile'
 import * as cards from '../../shared/cards'
 import * as notices from '../../shared/notices'
 import * as quiz from '../../shared/quiz'
+import { current, refreshLeague } from '../../shared/session'
+import { authHeaders, onUnauthorized } from '../lib/auth'
 
 // API 클라이언트. 서버가 꺼져 있으면 목 데이터로 대체해서 화면이 항상 뜨게 한다.
 // 단, 업로드·퀴즈 생성은 AI 서버 오류가 묻히지 않도록 서버가 준 { error }를 ApiError로 던진다.
@@ -49,7 +51,8 @@ async function errorOf(res: Response): Promise<string | null> {
 
 async function get<T>(path: string, fallback: T): Promise<T> {
   try {
-    const res = await fetch(path)
+    const res = await fetch(path, { headers: authHeaders() })
+    if (res.status === 401) onUnauthorized() // 토큰이 안 통함 → 로그인 화면으로
     if (!res.ok) throw new Error(String(res.status))
     return (await res.json()) as T
   } catch {
@@ -69,10 +72,14 @@ async function send<T>(
   try {
     res = await fetch(path, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(body),
     })
   } catch {
+    return fallback()
+  }
+  if (res.status === 401) {
+    onUnauthorized()
     return fallback()
   }
   if (!res.ok) {
@@ -88,21 +95,36 @@ async function send<T>(
 async function upload(form: FormData): Promise<Lecture> {
   let res: Response
   try {
-    res = await fetch('/api/lectures', { method: 'POST', body: form })
+    res = await fetch('/api/lectures', { method: 'POST', body: form, headers: authHeaders() })
   } catch {
     throw new ApiError('서버에 연결할 수 없어요')
   }
+  if (res.status === 401) onUnauthorized()
   if (!res.ok) throw new ApiError((await errorOf(res)) ?? '서버에 연결할 수 없어요')
   return (await res.json()) as Lecture
 }
 
+// 로그인·가입. 목으로 대체하지 않고 서버가 준 이유를 그대로 던진다.
+async function authCall(path: string, body: unknown): Promise<{ token: string; user: UserSummary }> {
+  let res: Response
+  try {
+    res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  } catch {
+    throw new ApiError('서버에 연결할 수 없어요')
+  }
+  if (!res.ok) throw new ApiError((await errorOf(res)) ?? '잠시 뒤 다시 해 주세요')
+  return (await res.json()) as { token: string; user: UserSummary }
+}
+
 export const api = {
-  me: () => get<UserSummary>('/api/me', mock.me),
+  signup: (input: { login: string; password: string; name: string }) => authCall('/api/auth/signup', input),
+  login: (input: { login: string; password: string }) => authCall('/api/auth/login', input),
+  me: () => get<UserSummary>('/api/me', current().me),
   updateProfile: (patch: { name?: string; dailyGoal?: number }) =>
     send<UserSummary | { error: string }>('PATCH', '/api/me', patch, () => profile.updateProfile(patch)),
   blocks: () => get<{ count: number }>('/api/blocks', board.blockedCount()),
   unblockAll: () => send<{ count: number }>('DELETE', '/api/blocks', {}, () => board.unblockAll()),
-  todayReviews: () => get<ReviewItem[]>('/api/reviews/today', mock.todayReviews),
+  todayReviews: () => get<ReviewItem[]>('/api/reviews/today', current().todayReviews),
   lectures: () => get<Lecture[]>('/api/lectures', mock.lectures),
   lecture: (id: string) =>
     get<Lecture | null>(`/api/lectures/${id}`, mock.lectures.find((l) => l.id === id) ?? null),
@@ -120,7 +142,7 @@ export const api = {
   audioUrl: (id: string) => `/api/lectures/${id}/audio-file`,
   transcript: (id: string) =>
     get<{ text: string | null; segments: TranscriptSegment[] } | null>(`/api/lectures/${id}/transcript`, null),
-  league: () => get<LeagueEntry[]>('/api/league', mock.league),
+  league: () => get<LeagueEntry[]>('/api/league', refreshLeague()),
 
   // 게시판
   posts: (kind?: BoardKind) =>
@@ -182,7 +204,7 @@ export const api = {
     ),
 
   // 녹음 폴더
-  recordingFolders: () => get<RecordingFolder[]>('/api/recording-folders', mock.recordingFolders),
+  recordingFolders: () => get<RecordingFolder[]>('/api/recording-folders', current().recordingFolders),
   createRecordingFolder: (name: string, lectureIds: string[] = []) =>
     send<RecordingFolder>('POST', '/api/recording-folders', { name, lectureIds }, () =>
       recFolders.createRecordingFolder(name, lectureIds),
@@ -197,7 +219,7 @@ export const api = {
     send<RecordingFolder[] | null>('POST', '/api/recording-folders/swap', { a, b }, () =>
       recFolders.swapRecordingFolders(a, b),
     ),
-  folders: () => get<Folder[]>('/api/folders', mock.folders),
+  folders: () => get<Folder[]>('/api/folders', current().folders),
   createFolder: (name: string, conceptIds: string[] = []) =>
     send<Folder>('POST', '/api/folders', { name, conceptIds }, () =>
       folderStore.createFolder(name, conceptIds),
