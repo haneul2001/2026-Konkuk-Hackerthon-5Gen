@@ -66,6 +66,14 @@ async function aiFetch(path: string, init?: RequestInit) {
 
 const LOGIN_RE = /^[a-z0-9_]{4,20}$/
 
+// AI 서버가 이상한 응답을 줬을 때 원인을 알려 준다. 404·405면 로그인 API가 없는 예전 AI 서버다.
+function aiError(r: Response, what: string): { error: string; status: number } {
+  console.warn(`${what}: AI 서버가 ${r.status}로 응답 (${AI}/api/store/users)`)
+  if (r.status === 404 || r.status === 405)
+    return { error: 'AI 서버가 예전 버전이에요. main을 받아 AI 서버를 다시 켜 주세요', status: 502 }
+  return { error: `${what}하지 못했어요 (AI 서버 ${r.status})`, status: 502 }
+}
+
 export type AuthResult = { token: string; user: UserSummary } | { error: string; status: number }
 
 export async function signup(input: { login?: string; password?: string; name?: string }): Promise<AuthResult> {
@@ -88,7 +96,7 @@ export async function signup(input: { login?: string; password?: string; name?: 
     return { error: 'AI 서버에 연결할 수 없어요. 잠시 뒤 다시 해 주세요', status: 503 }
   }
   if (r.status === 409) return { error: '이미 있는 아이디예요', status: 409 }
-  if (!r.ok) return { error: '가입하지 못했어요', status: 502 }
+  if (!r.ok) return aiError(r, '가입')
 
   users.set(id, newUserState(id, login, name))
   return { token: issueToken(id), user: users.get(id)!.me }
@@ -104,7 +112,7 @@ export async function login(input: { login?: string; password?: string }): Promi
     return { error: 'AI 서버에 연결할 수 없어요. 잠시 뒤 다시 해 주세요', status: 503 }
   }
   if (r.status === 404) return { error: '아이디나 비밀번호가 맞지 않아요', status: 401 }
-  if (!r.ok) return { error: '로그인하지 못했어요', status: 502 }
+  if (!r.ok) return aiError(r, '로그인')
   const row = (await r.json()) as UserRow
   if (!verifyPassword(password, row.passwordHash)) return { error: '아이디나 비밀번호가 맞지 않아요', status: 401 }
 

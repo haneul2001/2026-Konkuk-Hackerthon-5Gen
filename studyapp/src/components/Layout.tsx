@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import {
   BatteryFull,
@@ -81,15 +81,16 @@ export function Layout() {
   }, [pathname, search, location.key, location.state, navType])
 
   return (
-    <div className="min-h-dvh sm:flex sm:items-center sm:justify-center sm:py-6">
-      <div
-        className={cn(
-          'relative flex h-dvh w-full flex-col overflow-hidden bg-bg',
-          'sm:h-[min(844px,calc(100dvh-48px))] sm:w-[390px] sm:rounded-[52px] sm:border-[12px] sm:border-bezel sm:shadow-2xl',
-        )}
-      >
+    <PhoneFrame>
+      {/* 상단 배너: 상태바까지 건국대 초록으로 이어지고 아래에 연두 외곽선 */}
+      {immersive ? (
         <StatusBar />
-        {!immersive && <TopBar isRoot={isRoot} isHome={pathname === '/'} initial={initial} />}
+      ) : (
+        <div className="relative z-10 shrink-0 rounded-b-[28px] border-x-2 border-b-4 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
+          <StatusBar />
+          <TopBar isRoot={isRoot} isHome={pathname === '/'} initial={initial} />
+        </div>
+      )}
 
         <main
           ref={scrollRef}
@@ -108,13 +109,28 @@ export function Layout() {
         {!immersive && <TabBar />}
 
         {queue[0] && <NoticeBanner key={queue[0].id} notice={queue[0]} onDone={dismiss} />}
+    </PhoneFrame>
+  )
+}
+
+// 휴대폰에선 화면 전체, 그보다 넓으면 가운데 390×844 폰 프레임. 로그인 화면도 같이 쓴다.
+export function PhoneFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-dvh sm:flex sm:items-center sm:justify-center sm:py-6">
+      <div
+        className={cn(
+          'relative flex h-dvh w-full flex-col overflow-hidden bg-bg',
+          'sm:h-[min(844px,calc(100dvh-48px))] sm:w-[390px] sm:rounded-[52px] sm:border-[12px] sm:border-bezel sm:shadow-2xl',
+        )}
+      >
+        {children}
       </div>
     </div>
   )
 }
 
-// 데스크톱 미리보기에서만 보이는 가짜 상태바. 실제 폰에선 OS 상태바가 있다.
-function StatusBar() {
+// 데스크톱 미리보기에서만 보이는 가짜 상태바. 실제 폰에선 OS 상태바가 있다. 글자색은 바깥(배너)을 따른다.
+export function StatusBar() {
   return (
     <div
       aria-hidden
@@ -138,8 +154,13 @@ function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean;
   return (
     <header className="flex h-14 shrink-0 items-center justify-between px-3 pt-[env(safe-area-inset-top)]">
       {isRoot ? (
-        <span className="px-2 text-lg font-extrabold tracking-tight text-primary">
-          {isHome ? APP_NAME : ''}
+        <span className="px-2 text-[20px] font-extrabold tracking-tight">
+          {isHome && (
+            <>
+              <span className="text-highlight">{APP_NAME.slice(0, 1)}</span>
+              {APP_NAME.slice(1)}
+            </>
+          )}
         </span>
       ) : (
         <button
@@ -147,7 +168,7 @@ function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean;
           aria-label="뒤로"
           // 주소로 바로 들어온 경우엔 돌아갈 곳이 없으니 홈으로
           onClick={() => (key === 'default' ? navigate('/') : navigate(-1))}
-          className="flex size-11 cursor-pointer items-center justify-center rounded-full active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex size-11 cursor-pointer items-center justify-center rounded-full active:bg-white/15 focus-visible:outline-2 focus-visible:outline-highlight"
         >
           <ChevronLeft className="size-6" aria-hidden />
         </button>
@@ -158,8 +179,8 @@ function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean;
           aria-label="관리자"
           className={({ isActive }) =>
             cn(
-              'flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary',
-              isActive ? 'text-primary' : 'text-muted active:bg-line/60',
+              'flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-highlight',
+              isActive ? 'text-highlight' : 'text-white/85 active:bg-white/15',
             )
           }
         >
@@ -168,13 +189,13 @@ function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean;
         <NavLink
           to="/profile"
           aria-label="내 프로필"
-          className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-highlight"
         >
           {({ isActive }) => (
             <span
               className={cn(
-                'flex size-9 items-center justify-center rounded-full border-2 text-sm font-bold',
-                isActive ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface',
+                'flex size-9 items-center justify-center rounded-full border-2 border-highlight text-sm font-bold',
+                isActive ? 'bg-highlight text-primary-deep' : 'bg-white/10 text-white',
               )}
             >
               {initial}
