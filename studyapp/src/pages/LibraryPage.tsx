@@ -857,7 +857,7 @@ function FileLectureSheet({
               onClick={() => setTags(on ? tags.filter((x) => x !== t) : [...tags, t])}
               className={cn(
                 'h-9 cursor-pointer rounded-full border-2 px-3.5 text-[14px] font-semibold',
-                on ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line bg-surface text-muted',
+                on ? 'border-highlight-soft bg-highlight-soft text-primary-deep' : 'border-line bg-surface text-muted',
               )}
             >
               #{t}
@@ -982,7 +982,7 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
       className={cn(
         'h-11 shrink-0 cursor-pointer rounded-full border-2 px-4 text-sm font-semibold',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-        active ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line bg-surface text-muted',
+        active ? 'border-highlight-soft bg-highlight-soft text-primary-deep' : 'border-line bg-surface text-muted',
       )}
     >
       {label}

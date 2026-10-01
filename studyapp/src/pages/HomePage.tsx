@@ -357,7 +357,7 @@ function QuickTile({
       to={to}
       className="press block cursor-pointer rounded-2xl border-2 border-line bg-surface p-4 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
-      <span className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary">
+      <span className="flex size-10 items-center justify-center rounded-xl bg-highlight-soft text-primary-deep">
         {icon}
       </span>
       <p className="mt-3 text-[15px] font-bold">{title}</p>

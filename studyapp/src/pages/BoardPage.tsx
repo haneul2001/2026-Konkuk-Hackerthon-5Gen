@@ -161,7 +161,7 @@ function BoardList({ board, tag }: { board: BoardKind; tag: string }) {
           const on = tag === t
           const chip = cn(
             'flex h-9 shrink-0 items-center rounded-full border-2 text-[14px] font-semibold',
-            on ? 'border-highlight-deep bg-highlight text-primary-deep' : 'border-line bg-surface text-muted',
+            on ? 'border-highlight-soft bg-highlight-soft text-primary-deep' : 'border-line bg-surface text-muted',
           )
           return editing && t ? (
             <span key={t} className={cn(chip, 'pr-1 pl-3.5')}>
