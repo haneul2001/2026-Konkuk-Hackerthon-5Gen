@@ -82,12 +82,10 @@ export function Layout() {
 
   return (
     <PhoneFrame>
-      {/* 상단 배너: 상태바까지 건국대 초록으로 이어지고 아래에 연두 외곽선 */}
-      {immersive ? (
-        <StatusBar />
-      ) : (
-        <div className="relative z-10 shrink-0 rounded-b-[28px] border-x-2 border-b-4 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
-          <StatusBar />
+      <StatusBar />
+      {/* 상단 배너: 상태바 아래 화면 폭 가득 건국대 초록 띠, 네 면 모두 연두 외곽선 */}
+      {!immersive && (
+        <div className="relative z-10 mt-[env(safe-area-inset-top)] mb-1 shrink-0 border border-b-2 border-highlight bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary-deep)]">
           <TopBar isRoot={isRoot} isHome={pathname === '/'} initial={initial} />
         </div>
       )}
@@ -152,7 +150,7 @@ function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean;
   const { key } = useLocation()
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between px-3 pt-[env(safe-area-inset-top)]">
+    <header className="flex h-14 shrink-0 items-center justify-between px-3">
       {isRoot ? (
         <span className="px-2 text-[20px] font-extrabold tracking-tight">
           {isHome && (
