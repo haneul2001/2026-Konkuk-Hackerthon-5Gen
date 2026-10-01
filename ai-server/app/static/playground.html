@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>퀴즈 테스트</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2129; --muted: #6b7280; --line: #e3e6eb;
+    --primary: #3b5bdb; --ok: #2f9e44; --ok-bg: #ebfbee; --bad: #e03131; --bad-bg: #fff5f5; --warn: #e8590c; --warn-bg: #fff4e6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #15171c; --card: #1f2229; --text: #e9ebef; --muted: #9aa1ad; --line: #30343d;
+      --primary: #748ffc; --ok: #51cf66; --ok-bg: #1b2e20; --bad: #ff6b6b; --bad-bg: #331d1d; --warn: #ffa94d; --warn-bg: #33261a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, -apple-system, "Malgun Gothic", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .panel, .q { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+  select, textarea, button { font: inherit; color: inherit; }
+  select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 120px; }
+  .lecture { flex: 1 1 260px; } .lecture select { width: 100%; }
+  button { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+  button.primary { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .status { margin: 16px 0; color: var(--muted); font-size: 14px; min-height: 22px; }
+  .status.error { color: var(--bad); }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .chip { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+  .chip.warn { background: var(--warn-bg); border-color: transparent; color: var(--warn); font-weight: 600; }
+  .list { display: grid; gap: 12px; }
+  .q-head { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+  .prompt { font-weight: 600; margin: 0 0 12px; }
+  .choices { display: grid; gap: 8px; }
+  .choices button { text-align: left; padding: 10px 12px; }
+  .ox { display: flex; gap: 8px; } .ox button { flex: 1; font-size: 18px; font-weight: 700; }
+  button.correct { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+  button.wrong { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+  textarea { width: 100%; min-height: 80px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; }
+  .feedback { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--bg); font-size: 14px; }
+  .feedback b.ok { color: var(--ok); } .feedback b.bad { color: var(--bad); }
+  .kw { display: inline-block; margin: 2px 4px 0 0; padding: 1px 8px; border-radius: 99px; font-size: 12px; }
+  .kw.hit { background: var(--ok-bg); color: var(--ok); } .kw.miss { background: var(--bad-bg); color: var(--bad); }
+  .footer { margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .result { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>퀴즈 테스트</h1>
+  <p class="sub">AI 서버가 만든 문제를 직접 풀어보는 개발용 페이지예요. 틀리고 제출한 뒤 다시 만들면, 틀린 문제가 <b>다시 도전</b>으로 섞여 나와요.</p>
+
+  <section class="panel">
+    <div class="row">
+      <label class="lecture">강의<select id="lecture"></select></label>
+      <label>유형
+        <select id="type">
+          <option value="multiple">객관식</option>
+          <option value="ox">O/X</option>
+          <option value="essay">서술형</option>
+        </select>
+      </label>
+      <label>문제 수
+        <select id="count"><option>3</option><option selected>5</option><option>10</option></select>
+      </label>
+      <button id="make" class="primary">문제 만들기</button>
+    </div>
+  </section>
+
+  <p id="status" class="status"></p>
+  <div id="meta" class="meta"></div>
+  <div id="list" class="list"></div>
+  <div id="footer" class="footer" hidden>
+    <button id="submit" class="primary">채점 결과 제출</button>
+    <span id="result" class="result"></span>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id)
+let quiz = null
+let answers = {} // questionId → true | false | null(서술형)
+let timer = null
+
+async function api(path, body) {
+  const res = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined)
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+  return data
+}
+
+function setStatus(text, error = false) {
+  $('status').textContent = text
+  $('status').className = 'status' + (error ? ' error' : '')
+}
+
+async function loadLectures() {
+  try {
+    const lectures = (await api('/api/lectures')).filter((l) => l.status === 'ready' && l.cardCount > 0)
+    $('lecture').innerHTML = lectures.length
+      ? lectures.map((l) => `<option value="${l.id}">${escape(l.title)} · ${escape(l.course || '과목 없음')} · 개념 ${l.cardCount}</option>`).join('')
+      : '<option value="">요약이 끝난 강의가 없어요</option>'
+    $('make').disabled = !lectures.length
+  } catch (e) {
+    setStatus('강의 목록을 불러오지 못했어요: ' + e.message, true)
+  }
+}
+
+function escape(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+}
+
+async function makeQuiz() {
+  $('make').disabled = true
+  $('list').innerHTML = ''
+  $('meta').innerHTML = ''
+  $('footer').hidden = true
+  $('result').textContent = ''
+  const started = Date.now()
+  setStatus('문제를 만드는 중이에요… 0초')
+  timer = setInterval(() => setStatus(`문제를 만드는 중이에요… ${Math.round((Date.now() - started) / 1000)}초`), 1000)
+  try {
+    quiz = await api('/api/quiz', {
+      source: { kind: 'lecture', id: $('lecture').value },
+      type: $('type').value,
+      count: Number($('count').value),
+    })
+    answers = {}
+    if (!quiz) { setStatus('이 강의로는 문제를 만들 수 없어요.'); return }
+    setStatus(`${Math.round((Date.now() - started) / 1000)}초 걸렸어요.`)
+    renderMeta()
+    renderQuestions()
+    $('footer').hidden = false
+    updateSubmit()
+  } catch (e) {
+    setStatus('문제를 만들지 못했어요: ' + e.message, true)
+  } finally {
+    clearInterval(timer)
+    $('make').disabled = false
+  }
+}
+
+function renderMeta() {
+  const m = quiz.meta ?? {}
+  const retry = quiz.questions.filter((q) => q.retry).length
+  const dropped = {}
+  for (const [k, v] of Object.entries(m)) {
+    if (!k.startsWith('attempt')) continue
+    for (const [reason, n] of Object.entries(v.dropped ?? {})) dropped[reason] = (dropped[reason] ?? 0) + n
+  }
+  const names = { duplicate: '중복', ungrounded: '근거 없음', invalid: '형식 오류', unknown_concept: '개념 불명', over_quota: '초과' }
+  const chips = [
+    `<span class="chip">새로 만든 문제 ${m.generated ?? 0}개</span>`,
+    retry ? `<span class="chip warn">다시 도전 ${retry}개</span>` : '',
+    ...Object.entries(dropped).filter(([, n]) => n).map(([r, n]) => `<span class="chip">버림: ${names[r] ?? r} ${n}</span>`),
+  ]
+  $('meta').innerHTML = chips.join('')
+}
+
+function renderQuestions() {
+  $('list').innerHTML = quiz.questions.map((q, i) => `
+    <article class="q" id="q-${q.id}">
+      <div class="q-head">${i + 1}번 ${q.retry ? '<span class="chip warn">다시 도전</span>' : ''}</div>
+      <p class="prompt">${escape(q.prompt)}</p>
+      ${q.type === 'multiple' ? `<div class="choices">${q.choices.map((c, ci) => `<button data-q="${q.id}" data-i="${ci}">${escape(c)}</button>`).join('')}</div>` : ''}
+      ${q.type === 'ox' ? `<div class="ox"><button data-q="${q.id}" data-v="true">O</button><button data-q="${q.id}" data-v="false">X</button></div>` : ''}
+      ${q.type === 'essay' ? `<textarea data-q="${q.id}" placeholder="답을 써 보세요"></textarea><div style="margin-top:8px"><button data-essay="${q.id}">답 확인</button></div>` : ''}
+      <div class="feedback" hidden></div>
+    </article>`).join('')
+}
+
+function answer(q, correct, feedbackHtml) {
+  const card = $('q-' + q.id)
+  card.querySelectorAll('button').forEach((b) => (b.disabled = true))
+  const fb = card.querySelector('.feedback')
+  fb.hidden = false
+  fb.innerHTML = feedbackHtml
+  answers[q.id] = correct
+  updateSubmit()
+}
+
+$('list').addEventListener('click', (e) => {
+  const btn = e.target.closest('button')
+  if (!btn || btn.disabled) return
+  const q = quiz.questions.find((x) => x.id === (btn.dataset.q ?? btn.dataset.essay))
+  if (!q) return
+  if (q.type === 'multiple') {
+    const picked = Number(btn.dataset.i)
+    const buttons = $('q-' + q.id).querySelectorAll('.choices button')
+    buttons[q.answerIndex].classList.add('correct')
+    if (picked !== q.answerIndex) btn.classList.add('wrong')
+    const ok = picked === q.answerIndex
+    answer(q, ok, `<b class="${ok ? 'ok' : 'bad'}">${ok ? '정답' : '오답'}</b> · ${escape(q.explanation)}`)
+  } else if (q.type === 'ox') {
+    const picked = btn.dataset.v === 'true'
+    const ok = picked === q.answer
+    btn.classList.add(ok ? 'correct' : 'wrong')
+    answer(q, ok, `<b class="${ok ? 'ok' : 'bad'}">${ok ? '정답' : '오답'}</b> (정답: ${q.answer ? 'O' : 'X'}) · ${escape(q.explanation)}`)
+  } else {
+    // 서술형: studyapp과 같은 방식으로 핵심어 포함 여부만 보여주고 자동 채점은 하지 않는다
+    const text = $('q-' + q.id).querySelector('textarea').value.replace(/\s+/g, '').toLowerCase()
+    const hit = (g) => g.some((w) => text.includes(w.replace(/\s+/g, '').toLowerCase()))
+    const kws = q.keywords.map((g) => `<span class="kw ${hit(g) ? 'hit' : 'miss'}">${escape(g[0])}</span>`).join('')
+    answer(q, null, `핵심어 ${kws}<br><b>모범 답안</b> ${escape(q.modelAnswer)}`)
+  }
+})
+
+function updateSubmit() {
+  const done = quiz.questions.every((q) => q.id in answers)
+  $('submit').disabled = !done
+  $('submit').textContent = done ? '채점 결과 제출' : `다 풀면 제출할 수 있어요 (${Object.keys(answers).length}/${quiz.questions.length})`
+}
+
+$('submit').addEventListener('click', async () => {
+  $('submit').disabled = true
+  try {
+    const results = quiz.questions.map((q) => ({ questionId: q.id, correct: answers[q.id] }))
+    const res = await api(`/api/quiz/${quiz.id}/submit`, { results })
+    const wrong = results.filter((r) => r.correct === false).length
+    $('result').textContent = `제출했어요. 틀린 ${wrong}문제는 다음에 더 자주 나와요. 개념 숙련도 갱신 ${res.concepts.length}개.`
+  } catch (e) {
+    $('result').textContent = '제출하지 못했어요: ' + e.message
+    $('submit').disabled = false
+  }
+})
+
+$('make').addEventListener('click', makeQuiz)
+loadLectures()
+</script>
+</body>
+</html>
