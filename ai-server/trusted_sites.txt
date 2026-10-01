@@ -1,0 +1,9 @@
+# 퀴즈 오답 때 보여줄 글을 가져올 사이트 (한 줄에 도메인 하나, 줄 맨 앞 '#' 은 꺼짐)
+# 사이트마다 조회 방법이 달라서 app/resources.py 에 있는 사이트만 쓸 수 있다.
+#   gyoogle.dev      : GitHub 저장소 문서 목록
+#   inpa.tistory.com : 사이트맵 글 주소
+#   tcpschool.com    : 카카오 웹문서 검색 (KAKAO_REST_API_KEY 필요)
+gyoogle.dev
+inpa.tistory.com
+tcpschool.com
+# opentutorials.org  (생활코딩: 검색 API가 없고 사이트맵이 과목별로 나뉘어 있어 아직 지원하지 않음)

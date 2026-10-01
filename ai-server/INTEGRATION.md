@@ -18,6 +18,9 @@
 | `GET /api/lectures`, `GET /api/lectures/:id` | 같은 경로 | 그대로 |
 | `GET /api/lectures/:id/audio-file` | 같은 경로 | 그대로 (스트리밍) |
 | `GET /api/concepts?lecture=` | 같은 경로 | 그대로 |
+| `GET /api/lectures/:id/cards` | 같은 경로 | 그대로 (LecturePage의 카드 자리) |
+| `POST /api/lectures/:id/card-sessions` | 같은 경로 | 그대로. 큐카드 한 세트 |
+| `POST /api/card-sessions/:id/submit` | 같은 경로 | **AI 서버에 먼저 넘기고**, `finished: true`면 "한 세트 끝까지" XP를 준다 |
 | `POST /api/quiz` | 같은 경로 | 강의면 그대로. **폴더면 Express가 폴더를 풀어서** `conceptIds`, `source.title`을 붙인다 |
 | `POST /api/reviews/:id/quiz` | 같은 경로 | Express의 오늘 복습 항목에서 `{ lectureId, reason, count }`를 붙인다 |
 | `POST /api/quiz/:id/submit` | 같은 경로 | **AI 서버에 먼저 넘기고**, 응답의 `graded`로 XP·오답 복습을 처리한다 |
@@ -35,8 +38,16 @@
 
 - 처리 시간: 2시간 녹음 기준 약 2~3분. `title`을 안 주면 `N주차`로 시작해서 요약이 끝나면 `N주차 — 주제`가 된다.
 - `quizCount`는 지금까지 만든 문제 수다. 문제는 퀴즈를 누를 때 생기므로 처음에는 0이다.
+- `cardCount`는 큐카드 수다 (개념 수가 아니다).
+
+**Concept**: `resources`(공부 자료 링크 `[{kind, source, title, url, snippet}]`)가 더 붙는다.
+
+**큐카드**: `{ id, lectureId, conceptId, icon, front, answer, explanation, example, box, dueAt }`.
+`example`은 AI가 덧붙인 비유·예시라 강의 내용과 구분해서("AI 예시") 보여준다. `box`는 라이트너 상자 1~5 (아직 안 본 카드는 null).
+세트는 다시 볼 때가 된 카드와 몰라요 카드가 앞에 온다. 제출 응답 `{ finished, cardCount, known, unknown }`.
 
 **Quiz**: 모양은 같고 `meta`(재출제·생성 통계)가 더 붙는다. 문제 id는 `q_…`, 퀴즈 id는 `quiz_…`.
+문제마다 `retry`(전에 틀려서 다시 낸 문제)와 `resources`(그 개념의 공부 자료 링크)가 붙는다. **틀렸을 때 `resources`를 "이 개념 다시 공부하기"로 보여준다.**
 
 ## 퀴즈 생성 방식
 
@@ -77,6 +88,21 @@ app.get('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
 app.get('/api/concepts', (req, res) => forward(req, res))
+app.get('/api/lectures/:id/cards', (req, res) => forward(req, res))
+app.post('/api/lectures/:id/card-sessions', (req, res) => forward(req, res))
+// 큐카드 제출: AI 서버 응답의 finished가 true면 cards_done XP를 준다
+app.post('/api/card-sessions/:id/submit', async (req, res) => {
+  const r = await fetch(`${AI}${req.originalUrl}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req.body),
+  })
+  const result = await r.json()
+  if (r.ok && result.finished) {
+    // TODO(하늘): XP 지급 규칙 (POST /api/xp 의 cards_done)
+  }
+  res.status(r.status).json(result)
+})
 
 app.post('/api/quiz', (req, res) => {
   const { source } = req.body ?? {}
