@@ -4,19 +4,12 @@ import { FileAudio, Mic, RotateCcw, Square } from 'lucide-react'
 import { localDate } from '../../shared/mock'
 import { api, ApiError } from '../api/client'
 import { LIBRARY_NAME } from '../lib/names'
-import { Button, Field, PageTitle, Section, Segmented } from '../components/ui'
+import { Button, Field, PageTitle, Segmented } from '../components/ui'
 import { cn } from '../lib/cn'
 
 // 녹음·업로드 화면. 바로 녹음(MediaRecorder)과 파일 업로드 모두 AI 서버(POST /api/lectures)로 올라간다.
 // 녹음 버튼은 화면에 들어오자마자 가운데에 보이도록 탭 바로 아래에 둔다.
 
-const steps = [
-  '녹음 또는 파일 업로드',
-  '음성 인식(STT)으로 텍스트 변환',
-  'AI가 핵심 개념 단위로 요약',
-  '요약에서 플래시카드와 퀴즈 생성',
-  `완료되면 ${LIBRARY_NAME}에 녹음본과 개념이 저장`,
-]
 
 export function RecordPage() {
   const [params, setParams] = useSearchParams()
@@ -41,19 +34,6 @@ export function RecordPage() {
       ) : (
         <UploadForm initialCourse={params.get('course') ?? ''} initialDate={params.get('date') ?? ''} />
       )}
-
-      <Section title="처리 흐름">
-        <ol className="space-y-3">
-          {steps.map((s, i) => (
-            <li key={s} className="flex items-center gap-3 text-[15px]">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[13px] font-bold text-primary-deep tabular-nums">
-                {i + 1}
-              </span>
-              {s}
-            </li>
-          ))}
-        </ol>
-      </Section>
     </div>
   )
 }
@@ -91,7 +71,7 @@ function UploadForm({ initialCourse, initialDate }: { initialCourse: string; ini
   return (
     <form onSubmit={submit} className="space-y-4">
       <label className="flex cursor-pointer flex-col items-center rounded-2xl border-2 border-dashed border-line-strong bg-surface px-5 py-10 text-center active:bg-bg has-focus-visible:outline-2 has-focus-visible:outline-primary">
-        <span className="flex size-12 items-center justify-center rounded-xl bg-primary-soft text-primary">
+        <span className="flex size-12 items-center justify-center rounded-xl bg-highlight text-primary-deep shadow-[0_3px_0_var(--color-highlight-deep)]">
           <FileAudio className="size-6" aria-hidden />
         </span>
         <span className="mt-3 max-w-full truncate text-[15px] font-bold">
