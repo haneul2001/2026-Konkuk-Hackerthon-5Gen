@@ -9,6 +9,7 @@ import type {
   NewPost,
   Notice,
   Quiz,
+  RecordingFolder,
   Report,
   ReportReason,
   QuizSource,
@@ -22,6 +23,9 @@ import * as mock from '../../shared/mock'
 import * as admin from '../../shared/admin'
 import * as board from '../../shared/board'
 import * as folderStore from '../../shared/folders'
+import * as recFolders from '../../shared/recordingFolders'
+import * as recTags from '../../shared/recordingTags'
+import * as profile from '../../shared/profile'
 import * as notices from '../../shared/notices'
 import * as quiz from '../../shared/quiz'
 
@@ -52,7 +56,7 @@ async function get<T>(path: string, fallback: T): Promise<T> {
 
 // 쓰기 요청. 서버가 없으면 같은 shared 로직을 브라우저에서 돌린다(새로고침하면 초기화).
 async function send<T>(
-  method: 'POST' | 'PATCH' | 'DELETE',
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   path: string,
   body: unknown,
   fallback: () => T,
@@ -91,6 +95,10 @@ async function upload(form: FormData): Promise<Lecture> {
 
 export const api = {
   me: () => get<UserSummary>('/api/me', mock.me),
+  updateProfile: (patch: { name?: string; dailyGoal?: number }) =>
+    send<UserSummary | { error: string }>('PATCH', '/api/me', patch, () => profile.updateProfile(patch)),
+  blocks: () => get<{ count: number }>('/api/blocks', board.blockedCount()),
+  unblockAll: () => send<{ count: number }>('DELETE', '/api/blocks', {}, () => board.unblockAll()),
   todayReviews: () => get<ReviewItem[]>('/api/reviews/today', mock.todayReviews),
   lectures: () => get<Lecture[]>('/api/lectures', mock.lectures),
   lecture: (id: string) =>
@@ -143,6 +151,37 @@ export const api = {
     ),
   concepts: () => get<Concept[]>('/api/concepts', mock.concepts),
 
+  // 녹음 태그
+  recordingTags: () => get<recTags.RecordingTagState>('/api/recording-tags', recTags.tagState()),
+  addRecordingTag: (name: string) =>
+    send<recTags.RecordingTagState | { error: string }>('POST', '/api/recording-tags', { name }, () =>
+      recTags.addTag(name),
+    ),
+  removeRecordingTag: (name: string) =>
+    send<recTags.RecordingTagState>('DELETE', `/api/recording-tags/${encodeURIComponent(name)}`, {}, () =>
+      recTags.removeTag(name),
+    ),
+  setLectureTags: (lectureId: string, tags: string[]) =>
+    send<recTags.RecordingTagState>('PUT', `/api/recording-tags/lectures/${lectureId}`, { tags }, () =>
+      recTags.setLectureTags(lectureId, tags),
+    ),
+
+  // 녹음 폴더
+  recordingFolders: () => get<RecordingFolder[]>('/api/recording-folders', mock.recordingFolders),
+  createRecordingFolder: (name: string, lectureIds: string[] = []) =>
+    send<RecordingFolder>('POST', '/api/recording-folders', { name, lectureIds }, () =>
+      recFolders.createRecordingFolder(name, lectureIds),
+    ),
+  updateRecordingFolder: (id: string, patch: { name?: string; lectureIds?: string[] }) =>
+    send<RecordingFolder | null>('PATCH', `/api/recording-folders/${id}`, patch, () =>
+      recFolders.updateRecordingFolder(id, patch),
+    ),
+  deleteRecordingFolder: (id: string) =>
+    send<boolean>('DELETE', `/api/recording-folders/${id}`, {}, () => recFolders.deleteRecordingFolder(id)),
+  swapRecordingFolders: (a: string, b: string) =>
+    send<RecordingFolder[] | null>('POST', '/api/recording-folders/swap', { a, b }, () =>
+      recFolders.swapRecordingFolders(a, b),
+    ),
   folders: () => get<Folder[]>('/api/folders', mock.folders),
   createFolder: (name: string, conceptIds: string[] = []) =>
     send<Folder>('POST', '/api/folders', { name, conceptIds }, () =>
@@ -154,6 +193,9 @@ export const api = {
     ),
   deleteFolder: (id: string) =>
     send<boolean>('DELETE', `/api/folders/${id}`, {}, () => folderStore.deleteFolder(id)),
+  // 두 폴더 순서 맞바꾸기. 바뀐 전체 목록이 온다
+  swapFolders: (a: string, b: string) =>
+    send<Folder[] | null>('POST', '/api/folders/swap', { a, b }, () => folderStore.swapFolders(a, b)),
 
   // 강의 또는 폴더의 개념으로 문제를 만든다. AI 서버가 새로 만들어서 15~45초 걸린다.
   createQuiz: (source: Exclude<QuizSource, { kind: 'review' }>, type: QuizType, count: number) =>

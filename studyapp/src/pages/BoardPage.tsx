@@ -294,7 +294,7 @@ function PostDetail({ id }: { id: string }) {
     const r = await api.deletePost(post.id)
     if ('error' in r) return setDeleteError(r.error)
     // 지운 글로 뒤로 가지 않게 목록으로 바꿔 끼운다
-    navigate(post.board === 'free' ? '/board' : `/board?board=${post.board}`, { replace: true })
+    navigate(post.board === 'free' ? '/board' : `/board?board=${post.board}`, { replace: true, state: { scrollTop: true } })
   }
 
   return (
@@ -438,7 +438,7 @@ function PostDetail({ id }: { id: string }) {
             setBlockTarget(null)
             if (blockTarget.kind === 'post') {
               // 글쓴이를 차단했으니 이 글은 더 못 본다. 목록으로
-              navigate(post.board === 'free' ? '/board' : `/board?board=${post.board}`, { replace: true })
+              navigate(post.board === 'free' ? '/board' : `/board?board=${post.board}`, { replace: true, state: { scrollTop: true } })
               return
             }
             if (replyTo?.authorId === blockTarget.authorId) setReplyTo(null)
@@ -936,7 +936,7 @@ function WriteForm({ initialBoard, editing }: { initialBoard: BoardKind; editing
     setBusy(false)
     if ('error' in r) return setError(r.error)
     // 글쓰기·수정 화면은 기록에서 빼고 그 글로
-    navigate(`/board?post=${r.id}`, { replace: true })
+    navigate(`/board?post=${r.id}`, { replace: true, state: { scrollTop: true } })
   }
 
   return (

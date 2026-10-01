@@ -5,10 +5,10 @@ import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
 
-// 강의 상세: 요약 보기(TTS / 플래시카드)와 퀴즈 시작.
+// 강의 상세: 듣기(TTS) · 퀴즈(문제 풀기·플래시카드) · 전체 요약 탭. 기본은 듣기.
 // 업로드 직후엔 처리 중이라 몇 초마다 다시 불러와 단계·진행률을 보여준다.
 
-type Tab = 'cards' | 'tts' | 'text'
+type Tab = 'tts' | 'quiz' | 'text'
 
 const POLL_MS = 3000
 
@@ -22,7 +22,7 @@ const stageLabel: Record<string, string> = {
 export function LecturePage() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
-  const tab = (params.get('tab') as Tab) || 'cards'
+  const tab: Tab = params.get('tab') === 'quiz' || params.get('tab') === 'text' ? (params.get('tab') as Tab) : 'tts'
   // undefined: 불러오는 중, null: 없음
   const [lecture, setLecture] = useState<Lecture | null | undefined>(undefined)
   const [concepts, setConcepts] = useState<Concept[]>([])
@@ -95,14 +95,29 @@ export function LecturePage() {
             label="요약 보기 방식"
             value={tab}
             options={[
-              ['cards', '플래시카드'],
               ['tts', '듣기'],
+              ['quiz', '퀴즈'],
               ['text', '전체 요약'],
             ]}
             onChange={(key) => setParams({ tab: key }, { replace: true })}
           />
 
-          {tab === 'cards' &&
+          {tab === 'quiz' && (
+            <Card className="space-y-4 p-4">
+              <div>
+                <p className="text-[17px] font-bold">퀴즈 풀기</p>
+                <p className="mt-2 flex gap-1.5">
+                  <Tag>객관식</Tag>
+                  <Tag>O/X</Tag>
+                  <Tag>서술형</Tag>
+                </p>
+              </div>
+              <ButtonLink to={`/quiz?lecture=${lecture.id}`} variant="primary" className="w-full">
+                유형 고르고 시작
+              </ButtonLink>
+            </Card>
+          )}
+          {tab === 'quiz' &&
             (concepts.length > 0 ? (
               <Card className="space-y-4 p-4">
                 <div>
@@ -111,7 +126,7 @@ export function LecturePage() {
                     설명을 보고 개념을 떠올린 뒤, 뒤집어서 확인해요.
                   </p>
                 </div>
-                <ButtonLink to={`/flashcards?lecture=${lecture.id}`} variant="primary" className="w-full">
+                <ButtonLink to={`/flashcards?lecture=${lecture.id}`} className="w-full">
                   <Layers className="size-5" aria-hidden />
                   플래시카드 넘기기
                 </ButtonLink>
@@ -171,20 +186,6 @@ export function LecturePage() {
               owner="나"
             />
           )}
-
-          <Card className="space-y-4 p-4">
-            <div>
-              <p className="text-[17px] font-bold">퀴즈 풀기</p>
-              <p className="mt-2 flex gap-1.5">
-                <Tag>객관식</Tag>
-                <Tag>O/X</Tag>
-                <Tag>서술형</Tag>
-              </p>
-            </div>
-            <ButtonLink to={`/quiz?lecture=${lecture.id}`} variant="primary" className="w-full">
-              유형 고르고 시작
-            </ButtonLink>
-          </Card>
         </>
       )}
     </div>

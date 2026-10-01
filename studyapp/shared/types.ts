@@ -141,7 +141,7 @@ export type NewPost = {
   study?: { course: string; minXp: number; capacity: number; contact: string }
 }
 
-// 서재의 개념 카드. 강의 요약에서 핵심 개념 단위로 뽑힌다.
+// 학습 탭의 개념 카드. 강의 요약에서 핵심 개념 단위로 뽑힌다.
 export type Concept = {
   id: string
   term: string
@@ -159,6 +159,14 @@ export type Folder = {
   id: string
   name: string
   conceptIds: string[]
+  createdAt: string
+}
+
+// 녹음 폴더. 개념 폴더처럼 사용자가 만들고 녹음(강의)을 담는다.
+export type RecordingFolder = {
+  id: string
+  name: string
+  lectureIds: string[]
   createdAt: string
 }
 

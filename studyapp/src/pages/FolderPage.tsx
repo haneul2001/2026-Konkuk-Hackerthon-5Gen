@@ -46,7 +46,7 @@ export function FolderPage() {
       <Card className="px-5 py-8 text-center">
         <p className="text-[15px] text-muted">폴더를 찾을 수 없어요.</p>
         <ButtonLink to="/library?tab=concepts" variant="primary" className="mt-4">
-          {LIBRARY_NAME}로
+          {LIBRARY_NAME}으로
         </ButtonLink>
       </Card>
     )
@@ -58,10 +58,10 @@ export function FolderPage() {
         folder={folder}
         folders={folders}
         concepts={concepts}
-        onCancel={() => setParams({}, { replace: true })}
+        onCancel={() => setParams({}, { replace: true, state: { scrollTop: true } })}
         onSave={async (ids) => {
           await save({ conceptIds: ids })
-          setParams({}, { replace: true })
+          setParams({}, { replace: true, state: { scrollTop: true } })
         }}
       />
     )
@@ -123,7 +123,7 @@ export function FolderPage() {
         <Button
           variant={inFolder.length ? 'secondary' : 'primary'}
           className="w-full"
-          onClick={() => setParams({ add: '1' }, { replace: true })}
+          onClick={() => setParams({ add: '1' }, { replace: true, state: { scrollTop: true } })}
         >
           <Plus className="size-5" strokeWidth={2.5} aria-hidden />
           개념 담기

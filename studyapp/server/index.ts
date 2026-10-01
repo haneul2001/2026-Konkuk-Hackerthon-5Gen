@@ -6,6 +6,7 @@ import {
   addComment,
   blockCommentAuthor,
   blockPostAuthor,
+  blockedCount,
   createPost,
   deletePost,
   getPost,
@@ -16,11 +17,20 @@ import {
   reportPost,
   toggleCommentLike,
   toggleLike,
+  unblockAll,
   updatePost,
 } from '../shared/board'
-import { createFolder, deleteFolder, updateFolder } from '../shared/folders'
+import { updateProfile } from '../shared/profile'
+import { createFolder, deleteFolder, swapFolders, updateFolder } from '../shared/folders'
+import {
+  createRecordingFolder,
+  deleteRecordingFolder,
+  swapRecordingFolders,
+  updateRecordingFolder,
+} from '../shared/recordingFolders'
+import { addTag, removeTag, setLectureTags, tagState } from '../shared/recordingTags'
 import { currentNotices } from '../shared/notices'
-import { folders, league, me, todayReviews } from '../shared/mock'
+import { folders, league, me, recordingFolders, todayReviews } from '../shared/mock'
 import { submitQuiz, type GradedResult } from '../shared/quiz'
 
 // 백엔드. 강의·개념·문제는 AI 서버(ai-server/, 포트 8000)로 넘기고,
@@ -67,6 +77,15 @@ async function forward(req: express.Request, res: express.Response, body?: unkno
 
 // ---- 홈 ----
 app.get('/api/me', (_req, res) => res.json(me))
+// 프로필: 이름·하루 목표 바꾸기, 차단 관리
+app.patch('/api/me', (req, res) => {
+  // body: { name?, dailyGoal? }
+  const r = updateProfile(req.body ?? {})
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+app.get('/api/blocks', (_req, res) => res.json(blockedCount()))
+app.delete('/api/blocks', (_req, res) => res.json(unblockAll()))
 app.get('/api/reviews/today', (_req, res) => res.json(todayReviews))
 app.get('/api/league', (_req, res) => res.json(league))
 
@@ -77,15 +96,56 @@ app.post('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures', (req, res) => forward(req, res))
 app.get('/api/lectures/:id', (req, res) => forward(req, res))
 app.get('/api/lectures/:id/audio-file', (req, res) => forward(req, res))
-// 서재의 개념 카드. ?lecture=ID 로 강의별 필터.
+// 학습 탭의 개념 카드. ?lecture=ID 로 강의별 필터.
 app.get('/api/concepts', (req, res) => forward(req, res))
 
-// ---- 서재 ----
+// ---- 학습 탭(폴더) ----
 // 개념 폴더: 사용자가 만들고 개념을 담는다. 폴더 단위로 퀴즈가 나온다.
+// 녹음 태그: 사용자가 만든 태그를 녹음에 단다. 응답은 항상 { tags, byLecture } 전체
+app.get('/api/recording-tags', (_req, res) => res.json(tagState()))
+app.post('/api/recording-tags', (req, res) => {
+  // body: { name }
+  const r = addTag(String(req.body?.name ?? ''))
+  if ('error' in r) return res.status(400).json(r)
+  res.json(r)
+})
+app.delete('/api/recording-tags/:name', (req, res) => res.json(removeTag(req.params.name)))
+app.put('/api/recording-tags/lectures/:id', (req, res) => {
+  // body: { tags: string[] }
+  res.json(setLectureTags(req.params.id, Array.isArray(req.body?.tags) ? req.body.tags : []))
+})
+
+// 녹음 폴더: 개념 폴더와 같은 방식으로 녹음(강의)을 담는다.
+app.get('/api/recording-folders', (_req, res) => res.json(recordingFolders))
+app.post('/api/recording-folders', (req, res) => {
+  // body: { name, lectureIds? }
+  res.json(createRecordingFolder(String(req.body?.name ?? ''), req.body?.lectureIds ?? []))
+})
+app.post('/api/recording-folders/swap', (req, res) => {
+  // body: { a, b }
+  const list = swapRecordingFolders(String(req.body?.a ?? ''), String(req.body?.b ?? ''))
+  if (!list) return res.status(404).json({ error: '폴더를 찾을 수 없어요' })
+  res.json(list)
+})
+app.patch('/api/recording-folders/:id', (req, res) => {
+  // body: { name?, lectureIds? }
+  const folder = updateRecordingFolder(req.params.id, req.body ?? {})
+  if (!folder) return res.status(404).json({ error: '폴더를 찾을 수 없어요' })
+  res.json(folder)
+})
+app.delete('/api/recording-folders/:id', (req, res) => {
+  res.json(deleteRecordingFolder(req.params.id))
+})
 app.get('/api/folders', (_req, res) => res.json(folders))
 app.post('/api/folders', (req, res) => {
   // body: { name, conceptIds? }
   res.json(createFolder(String(req.body?.name ?? ''), req.body?.conceptIds ?? []))
+})
+app.post('/api/folders/swap', (req, res) => {
+  // body: { a, b }  두 폴더 순서를 맞바꾸고 바뀐 목록을 돌려준다
+  const list = swapFolders(String(req.body?.a ?? ''), String(req.body?.b ?? ''))
+  if (!list) return res.status(404).json({ error: '폴더를 찾을 수 없어요' })
+  res.json(list)
 })
 app.patch('/api/folders/:id', (req, res) => {
   // body: { name?, conceptIds? }

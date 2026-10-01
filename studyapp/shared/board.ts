@@ -144,6 +144,15 @@ export function reportPost(id: string, reason: ReportReason): { ok: true } | Fai
   return { ok: true }
 }
 
+// 프로필: 차단한 사람 수, 모두 해제
+export function blockedCount() {
+  return { count: blockedUsers.size }
+}
+export function unblockAll() {
+  blockedUsers.clear()
+  return { count: 0 }
+}
+
 // 관리자 화면용. 최근 신고부터
 export function listReports(): Report[] {
   return [...reports].sort(newest)

@@ -154,7 +154,7 @@ export function HomePage() {
       </div>
 
       {/* 최근 강의 */}
-      <Section title="최근 강의" action={{ label: LIBRARY_NAME, to: '/library' }}>
+      <Section title="최근 강의" action={{ label: LIBRARY_NAME, to: '/library?tab=recordings' }}>
         {lectures === null ? (
           <ListSkeleton rows={3} />
         ) : lectures.length === 0 ? (

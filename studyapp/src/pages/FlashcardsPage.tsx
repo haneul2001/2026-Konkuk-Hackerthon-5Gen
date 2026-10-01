@@ -9,7 +9,7 @@ import { ButtonLink, Card, ListSkeleton, PageTitle } from '../components/ui'
 // 플래시카드 보기. 어떤 개념 묶음을 넘길지는 주소로 정한다.
 //  /flashcards?folder=ID    내가 만든 폴더의 개념
 //  /flashcards?lecture=ID   강의 하나의 개념
-//  /flashcards?course=과목  서재의 과목 필터 (없으면 전체 개념)
+//  /flashcards?course=과목  학습 탭의 과목 필터 (없으면 전체 개념)
 
 export function FlashcardsPage() {
   const [params] = useSearchParams()
@@ -67,7 +67,7 @@ export function FlashcardsPage() {
     )
   }
 
-  // 주소로 바로 들어왔으면 뒤로 갈 곳이 없으니 서재로
+  // 주소로 바로 들어왔으면 뒤로 갈 곳이 없으니 학습 탭으로
   const quit = () =>
     (window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate('/library?tab=concepts')
 

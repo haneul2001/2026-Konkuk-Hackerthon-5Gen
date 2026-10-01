@@ -7,8 +7,10 @@ import { FolderPage } from './pages/FolderPage'
 import { HomePage } from './pages/HomePage'
 import { LecturePage } from './pages/LecturePage'
 import { LibraryPage } from './pages/LibraryPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { QuizPage } from './pages/QuizPage'
 import { RankingPage } from './pages/RankingPage'
+import { RecordingFolderPage } from './pages/RecordingFolderPage'
 import { RecordPage } from './pages/RecordPage'
 
 export default function App() {
@@ -19,12 +21,14 @@ export default function App() {
         <Route path="record" element={<RecordPage />} />
         <Route path="library" element={<LibraryPage />} />
         <Route path="library/folders/:id" element={<FolderPage />} />
+        <Route path="library/recording-folders/:id" element={<RecordingFolderPage />} />
         <Route path="lectures/:id" element={<LecturePage />} />
         <Route path="quiz" element={<QuizPage />} />
         <Route path="flashcards" element={<FlashcardsPage />} />
         <Route path="ranking" element={<RankingPage />} />
         <Route path="board" element={<BoardPage />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
     </Routes>
   )

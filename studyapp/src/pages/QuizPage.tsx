@@ -213,7 +213,7 @@ function Setup({ onStart }: { onStart: (quiz: Quiz) => void }) {
                 {folders.map((f) => (
                   <li key={f.id}>
                     <Row
-                      onClick={() => setParams({ folder: f.id }, { replace: true })}
+                      onClick={() => setParams({ folder: f.id }, { replace: true, state: { scrollTop: true } })}
                       leading={<FolderBadge />}
                       title={f.name}
                       meta={`개념 ${f.conceptIds.length}개`}
@@ -230,7 +230,7 @@ function Setup({ onStart }: { onStart: (quiz: Quiz) => void }) {
               {ready.map((l) => (
                 <li key={l.id}>
                   <Row
-                    onClick={() => setParams({ lecture: l.id }, { replace: true })}
+                    onClick={() => setParams({ lecture: l.id }, { replace: true, state: { scrollTop: true } })}
                     leading={<CourseBadge course={l.course} />}
                     title={l.title}
                     meta={`개념 ${concepts.filter((c) => c.lectureId === l.id).length}개`}

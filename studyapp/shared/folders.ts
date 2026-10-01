@@ -1,4 +1,4 @@
-import { concepts, folders } from './mock'
+import { folders } from './mock'
 import type { Folder } from './types'
 
 // 개념 폴더 만들기·수정·삭제. 서버와 (서버가 꺼져 있을 때) 프론트가 같은 코드를 쓴다.
@@ -32,8 +32,16 @@ export function deleteFolder(id: string): boolean {
   return true
 }
 
-// 없는 개념 id와 중복은 버린다.
+// 두 폴더 자리를 맞바꾼다. 목록 순서가 곧 화면 순서다.
+export function swapFolders(a: string, b: string): Folder[] | null {
+  const i = folders.findIndex((f) => f.id === a)
+  const j = folders.findIndex((f) => f.id === b)
+  if (i < 0 || j < 0) return null
+  ;[folders[i], folders[j]] = [folders[j], folders[i]]
+  return folders
+}
+
+// 중복과 빈 값은 버린다. 개념은 AI 서버에 있어서 여기서 존재 여부는 따지지 않는다.
 function validIds(ids: string[]) {
-  const known = new Set(concepts.map((c) => c.id))
-  return [...new Set(ids)].filter((id) => known.has(id))
+  return [...new Set(ids.map(String))].filter(Boolean)
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import {
   BatteryFull,
   ChevronLeft,
@@ -39,7 +39,10 @@ const TAB_ROOTS = tabs.map((t) => t.to)
 const SUB_VIEW = /[?&](post|write|edit|review|lecture|folder)=/
 
 export function Layout() {
-  const { pathname, search } = useLocation()
+  const location = useLocation()
+  const { pathname, search } = location
+  const navType = useNavigationType()
+  const prevPath = useRef(pathname)
   const scrollRef = useRef<HTMLElement>(null)
   const isRoot = TAB_ROOTS.includes(pathname) && !SUB_VIEW.test(search)
   const [immersive, setImmersive] = useState(false)
@@ -54,6 +57,12 @@ export function Layout() {
   }, [])
   const dismiss = useCallback(() => setQueue((q) => q.slice(1)), [])
 
+  // 프로필 버튼에 이름 첫 글자. 프로필에서 이름을 바꿀 수 있어서 화면을 옮길 때마다 다시 읽는다.
+  const [initial, setInitial] = useState('')
+  useEffect(() => {
+    api.me().then((m) => setInitial(m.name.slice(0, 1)))
+  }, [pathname])
+
   // 앱을 열 때 한 번: 지금 상태로 생기는 알림(복습, 연속 기록 위험 등)을 띄운다.
   useEffect(() => {
     const t = setTimeout(() => api.notifications().then((list) => list.forEach(notify)), 800)
@@ -61,9 +70,15 @@ export function Layout() {
   }, [notify])
 
   // 스크롤 영역이 window가 아니라 main이라 화면 이동 시 직접 맨 위로 올린다.
+  // 단, 같은 화면에서 탭·필터처럼 주소만 바꿔 끼운(replace) 경우는 그 자리를 지킨다.
+  // replace인데도 화면이 통째로 바뀌는 곳은 navigate 옵션에 state: { scrollTop: true }를 넘긴다.
   useEffect(() => {
+    const samePage = prevPath.current === pathname
+    prevPath.current = pathname
+    const wantsTop = (location.state as { scrollTop?: boolean } | null)?.scrollTop
+    if (navType === 'REPLACE' && samePage && !wantsTop) return
     scrollRef.current?.scrollTo(0, 0)
-  }, [pathname, search])
+  }, [pathname, search, location.key, location.state, navType])
 
   return (
     <div className="min-h-dvh sm:flex sm:items-center sm:justify-center sm:py-6">
@@ -74,7 +89,7 @@ export function Layout() {
         )}
       >
         <StatusBar />
-        {!immersive && <TopBar isRoot={isRoot} isHome={pathname === '/'} />}
+        {!immersive && <TopBar isRoot={isRoot} isHome={pathname === '/'} initial={initial} />}
 
         <main
           ref={scrollRef}
@@ -116,7 +131,7 @@ function StatusBar() {
   )
 }
 
-function TopBar({ isRoot, isHome }: { isRoot: boolean; isHome: boolean }) {
+function TopBar({ isRoot, isHome, initial }: { isRoot: boolean; isHome: boolean; initial: string }) {
   const navigate = useNavigate()
   const { key } = useLocation()
 
@@ -150,15 +165,22 @@ function TopBar({ isRoot, isHome }: { isRoot: boolean; isHome: boolean }) {
         >
           <ShieldCheck className="size-6" aria-hidden />
         </NavLink>
-        <button
-          type="button"
+        <NavLink
+          to="/profile"
           aria-label="내 프로필"
-          className="flex size-11 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary"
         >
-          <span className="flex size-9 items-center justify-center rounded-full border-2 border-line-strong bg-surface text-sm font-bold">
-            하
-          </span>
-        </button>
+          {({ isActive }) => (
+            <span
+              className={cn(
+                'flex size-9 items-center justify-center rounded-full border-2 text-sm font-bold',
+                isActive ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface',
+              )}
+            >
+              {initial}
+            </span>
+          )}
+        </NavLink>
       </div>
     </header>
   )

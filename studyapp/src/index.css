@@ -104,6 +104,12 @@ body {
   from { transform: translateY(120%) scale(0.9); opacity: 0; }
 }
 
+/* 되돌리기 배너의 남은 시간 막대 */
+@keyframes shrink {
+  from { width: 100%; }
+  to { width: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

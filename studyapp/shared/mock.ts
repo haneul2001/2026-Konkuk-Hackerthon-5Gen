@@ -5,6 +5,7 @@ import type {
   Folder,
   LeagueEntry,
   Lecture,
+  RecordingFolder,
   ReviewItem,
   UserSummary,
 } from './types'
@@ -72,6 +73,87 @@ export const lectures: Lecture[] = [
     status: 'ready',
     cardCount: 8,
     quizCount: 10,
+  },
+  // 지난 녹음들(개념 없음). 녹음본 목록이 10개를 넘어 2페이지가 생기는지 보는 용도
+  {
+    id: 'lec_m1',
+    title: '9/15 운영체제',
+    course: '운영체제',
+    recordedAt: '2026-09-15',
+    durationMin: 66,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m2',
+    title: '9/14 데이터베이스',
+    course: '데이터베이스',
+    recordedAt: '2026-09-14',
+    durationMin: 50,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m3',
+    title: '9/9 자료구조',
+    course: '자료구조',
+    recordedAt: '2026-09-09',
+    durationMin: 73,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m4',
+    title: '9/8 운영체제',
+    course: '운영체제',
+    recordedAt: '2026-09-08',
+    durationMin: 70,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m5',
+    title: '9/7 데이터베이스',
+    course: '데이터베이스',
+    recordedAt: '2026-09-07',
+    durationMin: 48,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m6',
+    title: '9/2 자료구조',
+    course: '자료구조',
+    recordedAt: '2026-09-02',
+    durationMin: 75,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m7',
+    title: '9/1 운영체제',
+    course: '운영체제',
+    recordedAt: '2026-09-01',
+    durationMin: 64,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
+  },
+  {
+    id: 'lec_m8',
+    title: '8/31 데이터베이스',
+    course: '데이터베이스',
+    recordedAt: '2026-08-31',
+    durationMin: 55,
+    status: 'ready',
+    cardCount: 0,
+    quizCount: 0,
   },
 ]
 
@@ -409,6 +491,18 @@ export const studyContacts: Record<string, string> = {
   post_1: 'https://open.kakao.com/o/sample1',
   post_2: 'https://open.kakao.com/o/sample2',
   post_3: 'https://open.kakao.com/o/sample3',
+}
+
+// 사용자가 만든 녹음 폴더(목).
+export const recordingFolders: RecordingFolder[] = [
+  { id: 'rfd_1', name: '중간고사 녹음', lectureIds: ['lec_1', 'lec_2'], createdAt: '2026-09-30' },
+]
+
+// 녹음에 다는 내 태그(목). 과목과 별개로 사용자가 만든다.
+export const recordingTagList: string[] = ['시험범위', '다시듣기']
+export const lectureTags: Record<string, string[]> = {
+  lec_1: ['시험범위'],
+  lec_2: ['시험범위', '다시듣기'],
 }
 
 // 사용자가 만든 개념 폴더(목). 새로 녹음해서 생긴 개념은 어느 폴더에도 안 들어간 상태로 시작한다.
