@@ -308,7 +308,8 @@ def build_quiz(
         "id": quiz.id,
         "title": title,
         "source": source,
-        "questions": [to_frontend(q) for q in questions],
+        # retry: 전에 틀려서 다시 낸 문제 (화면에서 "다시 도전" 표시용)
+        "questions": [{**to_frontend(q), "retry": q in reused} for q in questions],
         "meta": stats,
     }
 

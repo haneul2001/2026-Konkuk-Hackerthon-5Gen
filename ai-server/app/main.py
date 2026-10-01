@@ -15,7 +15,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
@@ -527,6 +527,12 @@ def add_correction(course_id: str, body: CorrectionIn):
             # JSON 컬럼은 새 객체를 넣어야 변경이 저장된다
             course.corrections = {**course.corrections, body.wrong: body.right}
         return _course_dict(course)
+
+
+@app.get("/playground", response_class=HTMLResponse, include_in_schema=False)
+def playground():
+    """퀴즈 생성을 직접 풀어보는 개발용 페이지"""
+    return (Path(__file__).parent / "static" / "playground.html").read_text(encoding="utf-8")
 
 
 @app.get("/health")
