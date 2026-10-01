@@ -10,7 +10,6 @@ import { cn } from '../lib/cn'
 // 녹음·업로드 화면. 바로 녹음(MediaRecorder)과 파일 업로드 모두 AI 서버(POST /api/lectures)로 올라간다.
 // 녹음 버튼은 화면에 들어오자마자 가운데에 보이도록 탭 바로 아래에 둔다.
 
-
 export function RecordPage() {
   const [params, setParams] = useSearchParams()
   const mode = params.get('mode') === 'upload' ? 'upload' : 'record'
