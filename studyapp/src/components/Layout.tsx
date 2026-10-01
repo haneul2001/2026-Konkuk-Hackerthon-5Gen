@@ -84,11 +84,11 @@ export function Layout() {
 
   return (
     <PhoneFrame>
-      {/* 상단 배너: 화면 맨 위(상태바·노치 영역)부터 쿠 진녹색으로 덮고, 아래쪽에만 노란 선 */}
+      {/* 상단 배너: 화면 맨 위(상태바·노치 영역)부터 쿠 진녹색으로 덮고, 아래쪽에만 흰 선과 흰 그림자 */}
       {immersive ? (
         <StatusBar />
       ) : (
-        <div className="relative z-10 mb-1 shrink-0 border-b-2 border-highlight bg-primary pt-[env(safe-area-inset-top)] text-white shadow-[0_6px_14px_-4px_var(--color-surface)]">
+        <div className="relative z-10 mb-1 shrink-0 border-b-2 border-surface bg-primary pt-[env(safe-area-inset-top)] text-white shadow-[0_6px_14px_-4px_var(--color-surface)]">
           <StatusBar />
           <TopBar isRoot={isRoot} avatar={avatar} />
         </div>
