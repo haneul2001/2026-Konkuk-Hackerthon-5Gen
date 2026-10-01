@@ -58,7 +58,7 @@ export function RecordingCalendar({
   return (
     <div className="space-y-4">
       <Card className="overflow-hidden pb-1">
-        {/* 머리: 이전 달 · 10월 · 다음 달 · 오늘 */}
+        {/* 머리: 이전 달 · 10월 · 다음 달 */}
         <div className="flex items-center gap-1 px-2 pt-2 pb-1">
           <button
             type="button"
@@ -79,15 +79,6 @@ export function RecordingCalendar({
             className="flex size-10 cursor-pointer items-center justify-center rounded-full active:bg-line/60 focus-visible:outline-2 focus-visible:outline-primary"
           >
             <ChevronRight className="size-6" aria-hidden />
-          </button>
-          {/* 오늘로: 오늘 날짜가 적힌 네모 */}
-          <button
-            type="button"
-            aria-label="오늘로 가기"
-            onClick={() => pick(today)}
-            className="mr-1 ml-auto flex size-8 cursor-pointer items-center justify-center rounded-lg border-2 border-ink text-[13px] font-bold tabular-nums active:bg-line/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            {Number(today.slice(8))}
           </button>
         </div>
 
