@@ -116,12 +116,12 @@ export function AdminPage() {
             label="연속 학습일"
             value={me.streakDays}
             min={0}
-            max={60}
+            max={120}
             disabled={days >= 2}
             hint={
               days >= 2
                 ? '하루 이상 빠지면 연속 기록이 끊겨서 0일로 보여요.'
-                : '0~6일 평범 · 7일 조금 기쁨 · 8~29일 매우 기쁨 · 30일 이상 매우매우 기쁨'
+                : '0~6일 평범 · 7~29일 조금 기쁨 · 30~89일 매우 기쁨 · 90일 이상 매우매우 기쁨'
             }
             onChange={(n) => apply({ daysAgo: days, todaySolved: solved, streakDays: n })}
           />

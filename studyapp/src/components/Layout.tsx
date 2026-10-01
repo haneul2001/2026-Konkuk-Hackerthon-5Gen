@@ -230,7 +230,7 @@ function TabBar() {
               {({ isActive }) =>
                 center ? (
                   <>
-                    <span className="press -mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-white shadow-[0_4px_0_var(--color-primary-deep)] ring-4 ring-surface">
+                    <span className="press -mt-6 flex size-14 items-center justify-center rounded-full bg-highlight text-primary-deep shadow-[0_4px_0_var(--color-highlight-deep)] ring-4 ring-surface">
                       <Icon className="size-6" strokeWidth={2.5} aria-hidden />
                     </span>
                     <span>{label}</span>

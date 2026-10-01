@@ -196,10 +196,23 @@ export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concept
 }
 
 // ---------- 녹음 다시 듣기 (원본 + 자막) ----------
+// 줄 오른쪽 재생 버튼: 그 문장부터 듣는다. 원본이 있으면 녹음을, 없으면 자막을 소리 내 읽어 준다(브라우저 음성).
+// 따라가기를 켜 두면 지금 나오는 문장이 자막 상자 가운데로 온다.
 
 // startAt: 이 위치(초)부터 재생한다 (개념의 '근거 듣기'에서 넘어올 때)
 export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; startAt?: number }) {
   const audio = useRef<HTMLAudioElement>(null)
+  const list = useRef<HTMLOListElement>(null)
+  // undefined: 불러오는 중, null: 자막 없음
+  const [segments, setSegments] = useState<TranscriptSegment[] | null | undefined>(undefined)
+  const [missing, setMissing] = useState(false)
+  const [now, setNow] = useState(0)
+  const [follow, setFollow] = useState(true)
+  const [playing, setPlaying] = useState(false)
+  // 원본이 없을 때 읽어 주는 줄
+  const [ttsLine, setTtsLine] = useState(-1)
+  const ttsTurn = useRef(0)
+  const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 
   useEffect(() => {
     const el = audio.current
@@ -212,49 +225,104 @@ export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; sta
     else el.addEventListener('loadedmetadata', go, { once: true })
     return () => el.removeEventListener('loadedmetadata', go)
   }, [startAt])
-  const list = useRef<HTMLOListElement>(null)
-  // undefined: 불러오는 중, null: 자막 없음
-  const [segments, setSegments] = useState<TranscriptSegment[] | null | undefined>(undefined)
-  const [missing, setMissing] = useState(false)
-  const [now, setNow] = useState(0)
-  const [follow, setFollow] = useState(true)
 
   useEffect(() => {
     api.transcript(lectureId).then((t) => setSegments(t?.segments?.length ? t.segments : null))
   }, [lectureId])
 
-  const active = segments?.findIndex((s) => now >= s.start && now < s.end) ?? -1
+  // 화면을 떠나면 읽기를 멈춘다
+  useEffect(
+    () => () => {
+      ttsTurn.current++
+      if (ttsSupported) window.speechSynthesis.cancel()
+    },
+    [ttsSupported],
+  )
 
-  // 따라가기: 지금 문장이 자막 상자 안에 보이게 한다
+  const active = missing ? ttsLine : (segments?.findIndex((s) => now >= s.start && now < s.end) ?? -1)
+
+  // 따라가기: 지금 문장을 자막 상자 가운데로. 상자 안에서만 스크롤해서 화면 전체는 움직이지 않는다
   useEffect(() => {
-    if (!follow || active < 0 || !list.current) return
-    const el = list.current.children[active] as HTMLElement | undefined
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const box = list.current
+    if (!follow || active < 0 || !box) return
+    const el = box.children[active] as HTMLElement | undefined
+    if (!el) return
+    box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2, behavior: 'smooth' })
   }, [active, follow])
 
-  const seek = (sec: number) => {
-    if (!audio.current) return
-    audio.current.currentTime = sec
-    void audio.current.play()
+  // 원본이 없을 때: i번째 줄부터 차례로 읽는다
+  function speakFrom(i: number) {
+    if (!segments || !ttsSupported) return
+    const myTurn = ++ttsTurn.current
+    window.speechSynthesis.cancel()
+    if (i >= segments.length) {
+      setPlaying(false)
+      setTtsLine(-1)
+      return
+    }
+    setTtsLine(i)
+    setPlaying(true)
+    const u = new SpeechSynthesisUtterance(segments[i].text)
+    u.lang = 'ko-KR'
+    const voice = koreanVoice()
+    if (voice) u.voice = voice
+    u.onend = () => {
+      if (ttsTurn.current === myTurn) speakFrom(i + 1)
+    }
+    window.speechSynthesis.speak(u)
   }
+
+  const pause = () => {
+    if (missing) {
+      ttsTurn.current++
+      if (ttsSupported) window.speechSynthesis.cancel()
+      setPlaying(false)
+    } else audio.current?.pause()
+  }
+
+  // i번째 줄부터 듣기
+  const playFrom = (i: number) => {
+    if (!segments) return
+    if (missing) return speakFrom(i)
+    if (!audio.current) return
+    audio.current.currentTime = segments[i].start
+    void audio.current.play().catch(() => {})
+  }
+
+  // 위쪽 큰 버튼: 멈춘 자리(없으면 처음)부터 이어 듣기
+  const toggle = () => {
+    if (playing) return pause()
+    if (missing) return speakFrom(Math.max(0, ttsLine))
+    void audio.current?.play().catch(() => {})
+  }
+
+  const canPlay = missing ? ttsSupported && !!segments : true
 
   return (
     <Card className="space-y-4 p-4">
       <div>
         <p className="text-[17px] font-bold">녹음 다시 듣기</p>
-        <p className="mt-1 text-[14px] text-muted">문장을 누르면 그 부분부터 들어요.</p>
+        <p className="mt-1 text-[14px] text-muted">
+          {missing
+            ? '녹음 원본이 없어서 자막을 소리 내 읽어 줘요. 줄 오른쪽 재생 버튼을 누르면 그 문장부터 들어요.'
+            : '줄 오른쪽 재생 버튼을 누르면 그 문장부터 들어요.'}
+        </p>
       </div>
 
-      {missing ? (
-        <p className="text-[15px] text-muted">이 강의는 녹음 원본이 없어요.</p>
-      ) : (
+      {!missing && (
         <audio
           ref={audio}
           controls
           preload="metadata"
           src={api.audioUrl(lectureId)}
           onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
-          onError={() => setMissing(true)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+          onError={() => {
+            setMissing(true)
+            setPlaying(false)
+          }}
           className="w-full"
         />
       )}
@@ -265,28 +333,76 @@ export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; sta
         <p className="text-[14px] text-muted">자막이 없어요.</p>
       ) : (
         <>
-          <label className="flex items-center gap-2 text-[13px] text-muted">
-            <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
-            재생 위치 따라가기
-          </label>
-          <ol ref={list} className="max-h-96 space-y-0.5 overflow-y-auto rounded-xl bg-bg p-1.5">
-            {segments.map((s, i) => (
-              <li key={`${s.start}-${i}`}>
-                <button
-                  type="button"
-                  onClick={() => seek(s.start)}
-                  disabled={missing}
-                  aria-current={i === active ? 'true' : undefined}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggle}
+              disabled={!canPlay}
+              aria-label={playing ? '멈추기' : '이어 듣기'}
+              className="press flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-highlight text-primary-deep shadow-[0_3px_0_var(--color-highlight-deep)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {playing ? (
+                <Pause className="size-5" fill="currentColor" aria-hidden />
+              ) : (
+                <Play className="ml-0.5 size-5" fill="currentColor" aria-hidden />
+              )}
+            </button>
+            <label className="flex min-h-11 flex-1 cursor-pointer items-center gap-2 text-[14px] font-semibold text-muted">
+              <input
+                type="checkbox"
+                checked={follow}
+                onChange={(e) => setFollow(e.target.checked)}
+                className="size-4 accent-primary"
+              />
+              재생 위치 따라가기
+            </label>
+          </div>
+          {missing && !ttsSupported && (
+            <p className="text-[14px] text-muted">이 브라우저는 소리 내 읽기를 지원하지 않아요.</p>
+          )}
+          <ol ref={list} className="relative max-h-96 space-y-0.5 overflow-y-auto rounded-xl bg-bg p-1.5">
+            {segments.map((s, i) => {
+              const current = i === active
+              const nowPlaying = current && playing
+              return (
+                <li
+                  key={`${s.start}-${i}`}
+                  aria-current={current ? 'true' : undefined}
                   className={cn(
-                    'flex w-full cursor-pointer gap-3 rounded-lg px-2.5 py-2 text-left text-[14px] leading-relaxed',
-                    i === active ? 'bg-surface font-semibold text-primary-deep shadow-[0_2px_0_var(--color-line)]' : 'text-ink',
+                    'flex items-start gap-1 rounded-lg',
+                    current && 'bg-surface shadow-[0_2px_0_var(--color-line)]',
                   )}
                 >
-                  <span className="w-12 shrink-0 text-[12px] text-muted tabular-nums">{clock(s.start)}</span>
-                  <span className="text-pretty">{s.text}</span>
-                </button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => canPlay && playFrom(i)}
+                    className={cn(
+                      'flex min-w-0 flex-1 cursor-pointer gap-3 rounded-lg py-2 pl-2.5 text-left text-[14px] leading-relaxed',
+                      current ? 'font-semibold text-primary-deep' : 'text-ink',
+                    )}
+                  >
+                    <span className="w-10 shrink-0 text-[12px] text-muted tabular-nums">{clock(s.start)}</span>
+                    <span className="text-pretty">{s.text}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (nowPlaying ? pause() : playFrom(i))}
+                    disabled={!canPlay}
+                    aria-label={nowPlaying ? '멈추기' : `${clock(s.start)}부터 듣기`}
+                    className={cn(
+                      'flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40',
+                      nowPlaying ? 'bg-highlight text-primary-deep' : 'text-primary active:bg-line/60',
+                    )}
+                  >
+                    {nowPlaying ? (
+                      <Pause className="size-4" fill="currentColor" aria-hidden />
+                    ) : (
+                      <Play className="ml-0.5 size-4" fill="currentColor" aria-hidden />
+                    )}
+                  </button>
+                </li>
+              )
+            })}
           </ol>
         </>
       )}

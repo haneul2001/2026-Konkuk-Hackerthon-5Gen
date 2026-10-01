@@ -300,7 +300,7 @@ function LiveRecorder() {
             disabled={state === 'starting'}
             onClick={recording ? stop : start}
             className={cn(
-              'press mt-7 flex size-28 cursor-pointer items-center justify-center rounded-full bg-accent text-white shadow-[0_6px_0_var(--color-accent-ink)] ring-8 ring-accent-soft active:shadow-[0_3px_0_var(--color-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-primary disabled:opacity-60',
+              'press mt-7 flex size-28 cursor-pointer items-center justify-center rounded-full bg-highlight text-primary-deep shadow-[0_6px_0_var(--color-highlight-deep)] ring-8 ring-highlight/30 active:shadow-[0_3px_0_var(--color-highlight-deep)] focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-primary disabled:opacity-60',
               recording && 'animate-pulse motion-reduce:animate-none',
             )}
           >

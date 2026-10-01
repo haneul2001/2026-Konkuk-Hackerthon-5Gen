@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  디자인 토큰. 메인은 건국대 UI의 KU Dark Green(#036B29), 보조는 KU Light Green·라임.
+  디자인 토큰. 건국대 '쿠' 컬러: 배경 베이지(#F5EAD6), 배너·메인 진녹색(#005426), 강조 노랑(#F9C66A), 갈색(#6F573C).
   스타일은 UI UX Pro Max의 Flat + Vibrant & Block-based. 글자 대비 4.5:1 이상.
   컴포넌트에서는 hex 대신 이 이름만 쓴다. 그라디언트·글로우·보라색 없음.
 */
@@ -9,18 +9,19 @@
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
 
-  --color-bg: #f3faf4;
+  --color-bg: #f5ead6; /* 쿠 베이지 */
   --color-surface: #ffffff;
   --color-ink: #10301b;
-  --color-muted: #4d6655;
-  --color-line: #d3e8d8;
-  --color-line-strong: #afd3b7;
+  --color-muted: #6f573c; /* 쿠 갈색, 베이지 위 대비 5.9:1 */
+  --color-line: #eadcc0;
+  --color-line-strong: #d6c29c;
 
-  --color-primary: #036b29; /* KU Dark Green, 흰 글자 대비 6.9:1 */
-  --color-primary-deep: #024a1c; /* 블록 버튼 바닥 그림자 */
-  --color-primary-soft: #dcf5e1;
+  --color-primary: #005426; /* 쿠 진녹색, 흰 글자 대비 10:1 */
+  --color-primary-deep: #00361a; /* 블록 버튼 바닥 그림자 */
+  --color-primary-soft: #dcf0e0;
   --color-bright: #21ba31; /* KU Light Green, 채움·아이콘 전용 */
-  --color-highlight: #b8f329; /* KU 라임, 진녹색 위 강조 */
+  --color-highlight: #f9c66a; /* 쿠 노랑. 강조 버튼·진녹색 위 강조 (글자는 primary-deep) */
+  --color-highlight-deep: #c9973a; /* 노란 버튼 바닥 그림자 */
 
   --color-accent: #ea580c; /* 스트릭·순위. 아이콘·채움 전용 */
   --color-accent-ink: #c2410c; /* 글자용 */

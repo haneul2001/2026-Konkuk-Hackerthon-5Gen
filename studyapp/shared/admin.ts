@@ -37,8 +37,8 @@ export function presetFor(mood: Mood): StudyRecordInput {
     case 'glad':
       return { daysAgo: 1, todaySolved: 0, streakDays: 7 }
     case 'happy':
-      return { daysAgo: 1, todaySolved: 0, streakDays: 15 }
-    case 'joyful':
       return { daysAgo: 1, todaySolved: 0, streakDays: 30 }
+    case 'joyful':
+      return { daysAgo: 1, todaySolved: 0, streakDays: 90 }
   }
 }

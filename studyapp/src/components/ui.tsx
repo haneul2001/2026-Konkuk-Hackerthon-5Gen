@@ -79,9 +79,9 @@ const variants: Record<Variant, string> = {
     'border-2 border-line-strong bg-surface text-ink shadow-[0_4px_0_var(--color-line-strong)] active:shadow-[0_2px_0_var(--color-line-strong)]',
   danger:
     'bg-danger text-white shadow-[0_4px_0_var(--color-danger-deep)] active:shadow-[0_2px_0_var(--color-danger-deep)]',
-  // 색 블록 위에 올리는 흰 버튼
+  // 진녹색 블록 위에 올리는 강조(노란) 버튼
   inverse:
-    'bg-surface text-primary shadow-[0_4px_0_var(--color-primary-deep)] active:shadow-[0_2px_0_var(--color-primary-deep)]',
+    'bg-highlight text-primary-deep shadow-[0_4px_0_var(--color-highlight-deep)] active:shadow-[0_2px_0_var(--color-highlight-deep)]',
 }
 
 function buttonClass(variant: Variant = 'secondary', className?: string) {

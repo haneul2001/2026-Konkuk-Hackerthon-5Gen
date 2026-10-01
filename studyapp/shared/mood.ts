@@ -4,7 +4,7 @@ import type { Mood, UserSummary } from './types'
 // 마스코트 기분 규칙. "며칠째 안 했는지"와 "며칠 연속 했는지"로 정한다.
 //
 //   쉬는 중(연속 기록 끊김)     하루 빠짐 upset · 3일 이상 angry · 7일 이상 furious · 30일 이상 gaunt
-//   연속 기록이 살아 있으면     0~6일 normal · 7일 glad · 8~29일 happy · 30일 이상 joyful
+//   연속 기록이 살아 있으면     0~6일 normal · 7~29일 glad · 30~89일 happy · 90일(3달) 이상 joyful
 
 type StudyRecord = Pick<UserSummary, 'lastStudyDate' | 'todaySolved' | 'dailyGoal' | 'streakDays'>
 
@@ -32,8 +32,8 @@ export function moodOf(me: StudyRecord, today = localDate()): Mood {
   if (days >= 3) return 'angry'
   if (days === 2) return 'upset'
   const streak = currentStreak(me, today)
-  if (streak >= 30) return 'joyful'
-  if (streak >= 8) return 'happy'
+  if (streak >= 90) return 'joyful'
+  if (streak >= 30) return 'happy'
   if (streak >= 7) return 'glad'
   return 'normal'
 }
@@ -44,9 +44,9 @@ export const moodInfo: Record<Mood, { label: string; rule: string }> = {
   angry: { label: '화남', rule: '3일 이상 안 함' },
   upset: { label: '언짢음', rule: '하루 빠짐' },
   normal: { label: '평범', rule: '연속 0~6일' },
-  glad: { label: '조금 기쁨', rule: '연속 7일' },
-  happy: { label: '매우 기쁨', rule: '연속 8~29일' },
-  joyful: { label: '매우매우 기쁨', rule: '연속 30일 이상' },
+  glad: { label: '조금 기쁨', rule: '연속 7~29일' },
+  happy: { label: '매우 기쁨', rule: '연속 30~89일' },
+  joyful: { label: '매우매우 기쁨', rule: '연속 3달 이상' },
 }
 
 export const MOODS: Mood[] = ['gaunt', 'furious', 'angry', 'upset', 'normal', 'glad', 'happy', 'joyful']
