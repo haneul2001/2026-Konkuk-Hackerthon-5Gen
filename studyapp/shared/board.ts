@@ -19,6 +19,30 @@ const joinedByMe = new Set<string>() // 내가 참여한 스터디 글 id
 const blockedUsers = new Set<string>() // 내가 차단한 사람(authorId). 익명이어도 같은 사람이면 가린다
 const reports: Report[] = []
 
+// 저장소(server/persist.ts)용. 글·댓글은 mock.ts 배열이라 따로 저장되고, 여기 것만 모은다.
+export type BoardState = { joinedByMe: string[]; blockedUsers: string[]; reports: Report[] }
+
+export function exportBoardState(): BoardState {
+  return { joinedByMe: [...joinedByMe], blockedUsers: [...blockedUsers], reports }
+}
+
+export function importBoardState(data: unknown) {
+  const s = data as Partial<BoardState> | undefined
+  if (!s || typeof s !== 'object') return
+  if (Array.isArray(s.joinedByMe)) {
+    joinedByMe.clear()
+    for (const id of s.joinedByMe) joinedByMe.add(String(id))
+  }
+  if (Array.isArray(s.blockedUsers)) {
+    blockedUsers.clear()
+    for (const id of s.blockedUsers) blockedUsers.add(String(id))
+  }
+  if (Array.isArray(s.reports)) {
+    reports.length = 0
+    reports.push(...s.reports)
+  }
+}
+
 const newest = (a: { createdAt: string }, b: { createdAt: string }) => b.createdAt.localeCompare(a.createdAt)
 
 function view(p: BoardPost): BoardPost {

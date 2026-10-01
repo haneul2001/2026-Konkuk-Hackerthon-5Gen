@@ -44,6 +44,19 @@ const lectureOf = new Map<string, string>(
 // 처음엔 비어 있고, 퀴즈를 풀다 틀리면 생긴다.
 const wrongByLecture = new Map<string, Set<string>>()
 
+// 저장소(server/persist.ts)용: { 강의 id: 틀린 문제 id[] }
+export function exportWrongAnswers(): Record<string, string[]> {
+  return Object.fromEntries([...wrongByLecture].map(([k, v]) => [k, [...v]]))
+}
+
+export function importWrongAnswers(data: unknown) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return
+  wrongByLecture.clear()
+  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+    if (Array.isArray(v)) wrongByLecture.set(k, new Set(v.map(String)))
+  }
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {

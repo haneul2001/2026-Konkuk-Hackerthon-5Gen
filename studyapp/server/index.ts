@@ -23,6 +23,7 @@ import {
   updatePost,
 } from '../shared/board'
 import { updateProfile } from '../shared/profile'
+import { isLoaded, loadState, scheduleSave } from './persist'
 import { createFolder, deleteFolder, swapFolders, updateFolder } from '../shared/folders'
 import {
   createRecordingFolder,
@@ -46,6 +47,17 @@ const AI = process.env.AI_SERVER ?? 'http://localhost:8000'
 const app = express()
 app.use(cors())
 app.use(express.json())
+
+// 상태 저장: GET이 아닌 요청이 성공하면(여기서 처리한 것이든 AI 서버로 넘긴 것이든) 잠깐 뒤 통째로 저장한다.
+// 어떤 요청이 무엇을 바꿨는지 따지지 않아도 되게 단순하게 둔다. 저장은 300ms 모아서 한 번.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) scheduleSave()
+    })
+  }
+  next()
+})
 
 // 요청을 AI 서버로 그대로 넘긴다. multipart 업로드와 오디오 스트리밍도 된다.
 // body를 주면 그걸 JSON으로 보낸다(폴더·복습 정보를 붙일 때).
@@ -335,7 +347,8 @@ app.get('/api/health', async (_req, res) => {
   } catch {
     // AI 서버 꺼짐
   }
-  res.json({ ok: true, ai })
+  // store: AI 서버 DB에서 상태를 불러왔는지. false면 바뀐 게 저장되지 않는다
+  res.json({ ok: true, ai, store: isLoaded() })
 })
 
 // ---- 배포: 빌드된 화면(dist)도 여기서 내보낸다 ----
@@ -353,4 +366,5 @@ if (existsSync(DIST)) {
 const PORT = Number(process.env.PORT) || 3001
 app.listen(PORT, () => {
   console.log(`API server on http://localhost:${PORT} (AI 서버: ${AI})`)
+  void loadState() // 게시판·폴더·XP 등을 AI 서버 DB에서 불러온다
 })

@@ -23,7 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import logging
 
-from app import cards, config, resources, stt, vocab
+from app import cards, config, resources, store, stt, vocab
 from app.evidence import find_evidence, mentioned_in
 from app.naming import normalize_names
 from app.audio import PRESETS, preprocess, probe_duration
@@ -68,6 +68,7 @@ def _backfill_concepts(db: Session) -> None:
 
 
 app = FastAPI(title="학습도우미 AI 서버", lifespan=lifespan)
+app.include_router(store.router)  # studyapp Express 상태 저장소
 
 
 # 실패 응답은 studyapp 약속대로 { "error": "이유" }

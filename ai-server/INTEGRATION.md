@@ -179,4 +179,18 @@ studyapp   : npm run server   (3001)
 | 문제 수 부족 안내 | `Quiz.notice` | 퀴즈 첫 문제 위 |
 
 - 큐카드 결과는 라이트너 상자(다시 볼 간격 0·1·3·7·14일)로 저장되고, 다음에 몰라요 카드가 먼저 나온다.
-- TODO(하늘): 요약 듣기 5분마다 XP, 플래시카드 한 바퀴 XP(`cards_done`), 오답에 `resources` 링크 표시, 목 데이터 복습 항목 정리.
+- 하늘 쪽에서 붙인 것: 플래시카드 한 세트 XP(끝까지 넘기면 장당 1 XP, `POST /api/card-sets/done`), 퀴즈 결과의 오답에 `resources` 링크, 목 복습 항목 제거. TODO: 요약 듣기 5분마다 XP.
+
+## Express 상태 저장소 (`app/store.py`)
+
+Express가 메모리에 들고 있던 것(게시판 글·댓글·공감·차단·신고, 개념 폴더, 녹음 폴더·태그, XP·리그·하루 목표, 오늘 복습·오답 기록)을 이 서버 DB의 `app_state` 테이블에 둔다. 키마다 JSON 한 덩어리다(정식 테이블 아님. 로그인을 붙여 사용자별로 나눌 때 옮긴다).
+
+| API | 하는 일 |
+| --- | --- |
+| `GET /api/store` | 저장된 것 전부 `{ key: value }`. 처음엔 `{}` |
+| `PUT /api/store` | `{ key: value }`를 통째로 저장(덮어쓰기). 키는 영문·숫자·밑줄 64자 이내 |
+
+- Express(`server/persist.ts`)가 켜질 때 한 번 불러오고, GET이 아닌 요청이 성공할 때마다 300ms 모아서 통째로 저장한다.
+- 켜는 순서는 AI 서버 → Express. Express가 먼저 켜지면 5초마다 다시 시도하고, 연결 전엔 저장하지 않는다.
+- 키: `me`, `league`, `todayReviews`, `wrongAnswers`, `posts`, `comments`, `studyContacts`, `board`(참여·차단·신고), `folders`, `recordingFolders`, `recordingTagList`, `lectureTags`.
+
