@@ -3,21 +3,28 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
+    "start": "tsx server/index.ts",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "lucide-react": "^1.49.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4",
     "tailwind-merge": "^3.7.0",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -26,10 +33,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
     "oxlint": "^1.81.0",
-    "tsx": "^4.23.15",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }

@@ -1,0 +1,18 @@
+# Render 블루프린트: 화면(Vite 빌드)과 Express API를 웹 서비스 하나로 띄운다.
+# AI 서버는 팀원 PC에서 돌고 Cloudflare Tunnel 주소로 연결한다 (DEPLOY.md 참고).
+services:
+  - type: web
+    name: studyapp
+    runtime: node
+    rootDir: studyapp
+    plan: free
+    # NODE_ENV=production이어도 빌드 도구(vite·typescript)를 설치하도록 --include=dev
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Cloudflare Tunnel로 연 AI 서버 주소. 예: https://xxxx.trycloudflare.com (끝에 / 없이)
+      - key: AI_SERVER
+        sync: false

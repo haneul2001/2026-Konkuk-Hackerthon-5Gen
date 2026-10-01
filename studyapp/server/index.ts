@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs'
 import { Readable } from 'node:stream'
+import { fileURLToPath } from 'node:url'
 import cors from 'cors'
 import express from 'express'
 import { setStudyRecord } from '../shared/admin'
@@ -324,7 +326,31 @@ app.post('/api/posts/:id/join', (req, res) => {
   res.json(post)
 })
 
+// ---- 상태 확인 (Render 헬스 체크) ----
+// AI 서버가 꺼져 있어도 Express는 살아 있으니 200. ai 항목으로 AI 서버 연결 여부를 알려준다.
+app.get('/api/health', async (_req, res) => {
+  let ai = false
+  try {
+    ai = (await fetch(`${AI}/health`, { signal: AbortSignal.timeout(3000) })).ok
+  } catch {
+    // AI 서버 꺼짐
+  }
+  res.json({ ok: true, ai })
+})
+
+// ---- 배포: 빌드된 화면(dist)도 여기서 내보낸다 ----
+// Render 한 곳에서 화면과 API를 같은 주소로 띄우기 위해서다. 개발 중엔 dist가 없어도 되고 Vite(5173)를 쓴다.
+const DIST = fileURLToPath(new URL('../dist', import.meta.url))
+if (existsSync(DIST)) {
+  app.use(express.static(DIST))
+  // 화면 주소(/library, /board?post=… 등)를 새로고침해도 index.html을 준다
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api')) return next()
+    res.sendFile(`${DIST}/index.html`)
+  })
+}
+
 const PORT = Number(process.env.PORT) || 3001
 app.listen(PORT, () => {
-  console.log(`API server on http://localhost:${PORT}`)
+  console.log(`API server on http://localhost:${PORT} (AI 서버: ${AI})`)
 })
