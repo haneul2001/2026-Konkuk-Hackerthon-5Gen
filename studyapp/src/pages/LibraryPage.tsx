@@ -239,7 +239,7 @@ export function LibraryPage() {
           </div>
 
           {/* 과목·태그 필터. 가로로 넘친다. 한 번에 하나만 고른다 */}
-          <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="group" aria-label="과목·태그">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="과목·태그">
             {['', ...courses].map((c) => (
               <Chip
                 key={c || 'all'}
