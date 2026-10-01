@@ -24,11 +24,9 @@ import {
   Button,
   ButtonLink,
   Card,
-  CourseBadge,
   EmptyState,
   ListSkeleton,
   PageTitle,
-  Placeholder,
   Row,
   Segmented,
   Sheet,
@@ -45,6 +43,7 @@ import { cn } from '../lib/cn'
 type Tab = 'concepts' | 'calendar' | 'recordings'
 
 const PAGE_SIZE = 10
+const CONCEPT_PAGE_SIZE = 8 // 전체 개념은 카드가 커서 8개씩
 
 // 폴더 칸에서 쓰는 서버 동작. 개념 폴더와 녹음 폴더가 같은 화면을 쓴다.
 type FolderOps<T> = {
@@ -132,10 +131,16 @@ export function LibraryPage() {
   const currentPage = Math.min(page, pageCount)
   const shownLectures = filteredLectures.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const cardCount = (concepts ?? []).filter((c) => !course || c.course === course).length
-  const shownConcepts = (concepts ?? []).filter(
+  const filteredConcepts = (concepts ?? []).filter(
     (c) =>
       (!course || c.course === course) &&
       (!needle || `${c.term} ${c.summary} ${c.course}`.toLowerCase().includes(needle)),
+  )
+  const conceptPageCount = Math.max(1, Math.ceil(filteredConcepts.length / CONCEPT_PAGE_SIZE))
+  const conceptPage = Math.min(page, conceptPageCount)
+  const shownConcepts = filteredConcepts.slice(
+    (conceptPage - 1) * CONCEPT_PAGE_SIZE,
+    conceptPage * CONCEPT_PAGE_SIZE,
   )
 
   return (
@@ -295,7 +300,6 @@ export function LibraryPage() {
                           <div className="min-w-0 flex-1">
                             <Row
                               to={`/lectures/${l.id}`}
-                              leading={<CourseBadge course={l.course} />}
                               title={l.title}
                               meta={
                                 <span className="tabular-nums">
@@ -347,41 +351,41 @@ export function LibraryPage() {
           ) : shownConcepts.length === 0 ? (
             <NoMatch />
           ) : (
-            <ul className="space-y-2.5">
-              {shownConcepts.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    to={`/lectures/${c.lectureId}?tab=text`}
-                    className="press block cursor-pointer rounded-2xl border-2 border-line bg-surface p-4 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-[16px] font-bold">{c.term}</p>
-                      <Tag tone={masteryLabel[c.mastery].tone}>{masteryLabel[c.mastery].text}</Tag>
-                    </div>
-                    <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-pretty text-muted">
-                      {c.summary}
-                    </p>
-                    <p className="mt-2.5 truncate text-xs font-medium text-muted">
-                      {c.lectureTitle} 강의
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-2.5">
+                {shownConcepts.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      to={`/lectures/${c.lectureId}?tab=text`}
+                      className="press block cursor-pointer rounded-2xl border-2 border-line bg-surface p-4 shadow-[0_3px_0_var(--color-line)] active:shadow-[0_1px_0_var(--color-line)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-[16px] font-bold">{c.term}</p>
+                        <Tag tone={masteryLabel[c.mastery].tone}>{masteryLabel[c.mastery].text}</Tag>
+                      </div>
+                      <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-pretty text-muted">
+                        {c.summary}
+                      </p>
+                      <p className="mt-2.5 truncate text-xs font-medium text-muted">
+                        {c.lectureTitle} 강의
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {conceptPageCount > 1 && (
+                <Pager
+                  page={conceptPage}
+                  count={conceptPageCount}
+                  onGo={(n) => {
+                    update({ page: n })
+                    document.querySelector('main')?.scrollTo({ top: 0 })
+                  }}
+                />
+              )}
+            </>
           )}
 
-          <Placeholder
-            title={tab === 'recordings' ? '녹음 원본 저장소' : '개념 정리'}
-            description={
-              tab === 'recordings'
-                ? '올라온 녹음 파일을 스토리지에 보관하고 다시 듣기를 제공한다. 지금은 목록만 있다.'
-                : '요약 단계에서 핵심 개념을 뽑아 저장. 퀴즈 결과로 "익히는 중 → 외움" 갱신.'
-            }
-            endpoint={
-              tab === 'recordings' ? 'GET /api/lectures/:id/audio-file' : 'GET /api/concepts'
-            }
-            owner="나"
-          />
         </>
       )}
 

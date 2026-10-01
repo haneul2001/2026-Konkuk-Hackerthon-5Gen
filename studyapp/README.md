@@ -20,7 +20,7 @@ shared/      프론트·서버 공용 타입(types.ts), 목 데이터(mock.ts),
 server/      Express 스텁. 미구현 라우트는 501 + todo 메시지를 돌려준다
 src/
   api/       fetch 래퍼. 실패하면 목 데이터로 대체
-  components/ Layout(폰 프레임 + 상단 바 + 하단 탭), ui(Card, Button, Row, Segmented, Field, Placeholder 등)
+  components/ Layout(폰 프레임 + 상단 바 + 하단 탭), ui(Card, Button, Row, Segmented, Field 등)
   pages/     Home, Record, Library(학습), Lecture, Quiz, Ranking, Board
   lib/names.ts  서비스·학습 탭 이름 상수 (이름 바뀌면 여기만)
 ```
@@ -66,8 +66,6 @@ src/
 결과를 제출하면 맞힌 문제마다 10 XP, 리그 순위 갱신, 틀린 문제는 오늘 복습에 추가, 개념 숙련도(새 개념 → 익히는 중 → 외움) 갱신.
 서버가 꺼져 있으면 같은 `shared/quiz.ts`가 브라우저에서 돈다(새로고침하면 초기화).
 남은 일: 요약 기반 문제 생성(지금은 `quizBank.ts`), 서술형 AI 피드백(지금은 핵심어 비교), DB 저장.
-
-미완성 기능은 화면의 점선 박스(`Placeholder`)에 들어올 내용·API·담당이 적혀 있다.
 
 ## 디자인 원칙 (UI UX Pro Max 기준)
 

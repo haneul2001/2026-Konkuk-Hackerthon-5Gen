@@ -169,7 +169,6 @@ export function HomePage() {
                 <li key={l.id}>
                   <Row
                     to={`/lectures/${l.id}`}
-                    leading={<CourseBadge course={l.course} />}
                     title={l.title}
                     meta={`${l.durationMin}분 녹음`}
                     trailing={

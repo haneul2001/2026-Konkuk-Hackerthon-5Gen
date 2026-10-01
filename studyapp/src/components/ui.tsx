@@ -273,34 +273,6 @@ export function EmptyState({
   )
 }
 
-// 아직 안 만든 기능 자리. 무엇이 들어올지와 담당·API를 적어둔다.
-export function Placeholder({
-  title,
-  description,
-  endpoint,
-  owner,
-}: {
-  title: string
-  description: string
-  endpoint?: string
-  owner?: string
-}) {
-  return (
-    <div className="rounded-2xl border-2 border-dashed border-line-strong px-4 py-5">
-      <p className="text-sm font-bold">{title}</p>
-      <p className="mt-1 text-sm text-pretty text-muted">{description}</p>
-      {(endpoint || owner) && (
-        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-          {endpoint && (
-            <code className="rounded bg-surface px-1.5 py-0.5 break-all">{endpoint}</code>
-          )}
-          {owner && <span>담당: {owner}</span>}
-        </p>
-      )}
-    </div>
-  )
-}
-
 export function ListSkeleton({ rows }: { rows: number }) {
   return (
     <Card aria-busy="true" aria-label="불러오는 중">

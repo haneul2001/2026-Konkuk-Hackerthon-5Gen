@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Clock, Flame, Headphones, Layers, ListChecks, RotateCcw } from 'lucide-react'
 import type { LeagueEntry, UserSummary } from '../../shared/types'
 import { api } from '../api/client'
-import { Card, ListSkeleton, PageTitle, Placeholder, Section } from '../components/ui'
+import { Card, ListSkeleton, PageTitle, Section } from '../components/ui'
 import { Avatar } from '../components/Avatar'
 import { cn } from '../lib/cn'
 
@@ -91,15 +91,6 @@ export function RankingPage() {
             </ol>
           </Card>
         )}
-      </Section>
-
-      <Section title="누적 XP 랭킹">
-        <Placeholder
-          title="누적 랭킹 준비 중"
-          description="전체 사용자 누적 XP 순위. 게시판 참여 조건에 쓰인다."
-          endpoint="GET /api/ranking/total"
-          owner="나"
-        />
       </Section>
 
       <Section title="XP 얻는 방법">

@@ -4,7 +4,7 @@ import { CalendarClock, CircleAlert, Layers, Loader, Megaphone, Play } from 'luc
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
-import { ButtonLink, Card, CourseBadge, Placeholder, Segmented, Tag } from '../components/ui'
+import { ButtonLink, Card, CourseBadge, Segmented, Tag } from '../components/ui'
 import { clock } from '../lib/time'
 
 // 강의 상세: 듣기(TTS) · 퀴즈(문제 풀기·플래시카드) · 전체 요약 탭. 기본은 듣기.
@@ -213,13 +213,8 @@ export function LecturePage() {
               </ul>
             </Card>
           )}
-          {tab === 'text' && (
-            <Placeholder
-              title="전체 요약"
-              description="STT 텍스트를 핵심 개념 단위로 정리한 요약 본문."
-              endpoint="GET /api/lectures/:id"
-              owner="나"
-            />
+          {tab === 'text' && !lecture.overview && concepts.length === 0 && (
+            <p className="py-6 text-center text-[15px] text-muted">아직 요약이 없어요.</p>
           )}
         </>
       )}
