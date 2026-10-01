@@ -160,7 +160,7 @@ export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concept
             onClick={() => changeRate(r)}
             className={cn(
               'h-8 flex-1 cursor-pointer rounded-lg text-[13px] font-semibold',
-              rate === r ? 'bg-primary-soft text-primary-deep' : 'bg-bg text-muted',
+              rate === r ? 'bg-highlight-soft text-primary-deep' : 'bg-bg text-muted',
             )}
           >
             {r}배
@@ -179,10 +179,10 @@ export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concept
                 aria-current={active ? 'true' : undefined}
                 className={cn(
                   'w-full cursor-pointer rounded-xl px-3 py-2.5 text-left',
-                  active ? 'bg-primary-soft' : 'active:bg-bg',
+                  active ? 'bg-highlight-soft' : 'active:bg-bg',
                 )}
               >
-                <p className={cn('text-[15px] font-semibold', active && 'text-primary-deep')}>{s.label}</p>
+                <p className="text-[15px] font-semibold">{s.label}</p>
                 {active && (
                   <p className="mt-1 text-[14px] leading-relaxed text-pretty text-muted">{lines[line]?.[1]}</p>
                 )}
@@ -352,7 +352,7 @@ export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; sta
                 type="checkbox"
                 checked={follow}
                 onChange={(e) => setFollow(e.target.checked)}
-                className="size-4 accent-primary"
+                className="size-4 accent-highlight-deep"
               />
               재생 위치 따라가기
             </label>
@@ -378,7 +378,7 @@ export function RecordingPlayer({ lectureId, startAt }: { lectureId: string; sta
                     onClick={() => canPlay && playFrom(i)}
                     className={cn(
                       'flex min-w-0 flex-1 cursor-pointer gap-3 rounded-lg py-2 pl-2.5 text-left text-[14px] leading-relaxed',
-                      current ? 'font-semibold text-primary-deep' : 'text-ink',
+                      current ? 'font-semibold text-ink' : 'text-ink',
                     )}
                   >
                     <span className="w-10 shrink-0 text-[12px] text-muted tabular-nums">{clock(s.start)}</span>

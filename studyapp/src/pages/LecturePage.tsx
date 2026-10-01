@@ -241,7 +241,7 @@ function Evidence({ concept, onListen }: { concept: Concept; onListen: (sec: num
           type="button"
           title={e.text}
           onClick={() => onListen(e.start)}
-          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md bg-primary-soft px-2 text-[13px] font-semibold text-primary-deep tabular-nums"
+          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md bg-highlight-soft px-2 text-[13px] font-semibold text-primary-deep tabular-nums"
         >
           <Play className="size-3.5" aria-hidden />
           {clock(e.start)}

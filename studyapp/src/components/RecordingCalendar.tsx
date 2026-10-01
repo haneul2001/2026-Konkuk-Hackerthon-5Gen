@@ -269,7 +269,7 @@ function AddToDateSheet({
             key={l.id}
             className={cn(
               'flex cursor-pointer items-center gap-3 rounded-xl border-2 px-3.5 py-3',
-              picked === l.id ? 'border-primary bg-primary-soft' : 'border-line bg-surface',
+              picked === l.id ? 'border-highlight-deep bg-highlight-soft' : 'border-line bg-surface',
             )}
           >
             <input
@@ -277,7 +277,7 @@ function AddToDateSheet({
               name="move-lecture"
               checked={picked === l.id}
               onChange={() => setPicked(l.id)}
-              className="size-4 cursor-pointer accent-primary"
+              className="size-4 cursor-pointer accent-highlight-deep"
             />
             <span className="min-w-0">
               <span className="block truncate text-[15px] font-bold">{l.title}</span>

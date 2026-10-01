@@ -517,7 +517,7 @@ function FolderGrid<T extends { id: string; name: string }>({
       {moving && (
         <div
           role="status"
-          className="flex items-center justify-between rounded-xl bg-primary-soft px-3.5 py-2 text-[14px] font-semibold text-primary-deep"
+          className="flex items-center justify-between rounded-xl bg-highlight-soft px-3.5 py-2 text-[14px] font-semibold text-primary-deep"
         >
           자리를 바꿀 폴더를 누르세요
           <button
@@ -700,7 +700,7 @@ const UNDO_MS = 10_000
 function FolderCardBody({ name, count }: { name: string; count: string }) {
   return (
     <>
-      <FolderIcon className="size-5 text-muted" fill="var(--color-primary-soft)" aria-hidden />
+      <FolderIcon className="size-5 text-muted" fill="var(--color-highlight-soft)" aria-hidden />
       <span>
         <span className="line-clamp-2 text-[15px] leading-snug font-bold">{name}</span>
         <span className="mt-0.5 block text-xs text-muted tabular-nums">{count}</span>
@@ -821,7 +821,7 @@ function FileLectureSheet({
                 key={f.id}
                 className={cn(
                   'flex cursor-pointer items-center gap-3 rounded-xl border-2 px-3.5 py-3',
-                  checked.has(f.id) ? 'border-primary bg-primary-soft' : 'border-line bg-surface',
+                  checked.has(f.id) ? 'border-highlight-deep bg-highlight-soft' : 'border-line bg-surface',
                 )}
               >
                 <input
@@ -833,9 +833,9 @@ function FileLectureSheet({
                     else next.delete(f.id)
                     setChecked(next)
                   }}
-                  className="size-4 cursor-pointer accent-primary"
+                  className="size-4 cursor-pointer accent-highlight-deep"
                 />
-                <FolderIcon className="size-5 shrink-0 text-muted" fill="var(--color-primary-soft)" aria-hidden />
+                <FolderIcon className="size-5 shrink-0 text-muted" fill="var(--color-highlight-soft)" aria-hidden />
                 <span className="min-w-0">
                   <span className="block truncate text-[15px] font-bold">{f.name}</span>
                   <span className="block text-[12px] text-muted tabular-nums">녹음 {f.lectureIds.length}개</span>
@@ -952,7 +952,7 @@ function TagManagerSheet({
           {tags.map((t) => (
             <span
               key={t}
-              className="flex h-9 items-center gap-1 rounded-full bg-primary-soft pr-1 pl-3.5 text-[14px] font-semibold text-primary-deep"
+              className="flex h-9 items-center gap-1 rounded-full bg-highlight-soft pr-1 pl-3.5 text-[14px] font-semibold text-primary-deep"
             >
               #{t}
               <button

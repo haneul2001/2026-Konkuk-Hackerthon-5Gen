@@ -148,7 +148,7 @@ function Resources({ items }: { items: StudyResource[] }) {
 
 function ResultStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <Card className={cn('px-3 py-3 text-center', highlight && 'border-primary bg-primary-soft shadow-[0_3px_0_var(--color-primary)]')}>
+    <Card className={cn('px-3 py-3 text-center', highlight && 'border-highlight-deep bg-highlight-soft shadow-[0_3px_0_var(--color-highlight-deep)]')}>
       <p className="text-xl font-bold tabular-nums">{value}</p>
       <p className="text-xs font-medium text-muted">{label}</p>
     </Card>

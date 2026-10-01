@@ -127,7 +127,7 @@ export function Tag({
       className={cn(
         'inline-flex h-6 shrink-0 items-center rounded-md px-2 text-xs font-semibold',
         tone === 'neutral' && 'bg-bg text-muted',
-        tone === 'primary' && 'bg-primary-soft text-primary-deep',
+        tone === 'primary' && 'bg-highlight-soft text-primary-deep',
         tone === 'accent' && 'bg-accent-soft text-accent-ink',
         tone === 'success' && 'bg-success-soft text-success',
         tone === 'danger' && 'bg-danger-soft text-danger',

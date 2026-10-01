@@ -139,7 +139,7 @@ function LecturePicker({
               key={l.id}
               className={cn(
                 'flex cursor-pointer items-center gap-3 rounded-xl border-2 px-3.5 py-3',
-                picked.has(l.id) ? 'border-primary bg-primary-soft' : 'border-line bg-surface',
+                picked.has(l.id) ? 'border-highlight-deep bg-highlight-soft' : 'border-line bg-surface',
               )}
             >
               <input
@@ -151,7 +151,7 @@ function LecturePicker({
                   else next.delete(l.id)
                   setPicked(next)
                 }}
-                className="size-4 cursor-pointer accent-primary"
+                className="size-4 cursor-pointer accent-highlight-deep"
               />
               <span className="min-w-0">
                 <span className="block truncate text-[15px] font-bold">{l.title}</span>

@@ -627,7 +627,7 @@ function StudyBox({
 
       {study.contact ? (
         // 글쓴이이거나 참여한 사람: 연락처 공개
-        <div className="rounded-xl bg-primary-soft px-4 py-3">
+        <div className="rounded-xl bg-highlight-soft px-4 py-3">
           <p className="text-[13px] font-bold text-primary-deep">
             {post.mine ? '내가 올린 모집글이에요 · 연락처' : '참여했어요! 아래로 연락하세요'}
           </p>
@@ -864,7 +864,7 @@ function ReportSheet({ target, onClose }: { target: ModTarget; onClose: () => vo
               name="report-reason"
               checked={reason === r}
               onChange={() => setReason(r)}
-              className="size-4 cursor-pointer accent-primary"
+              className="size-4 cursor-pointer accent-highlight-deep"
             />
             {r}
           </label>
@@ -980,7 +980,7 @@ function AnonymousCheck({ checked, onChange, id }: { checked: boolean; onChange:
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="size-4 cursor-pointer accent-primary"
+        className="size-4 cursor-pointer accent-highlight-deep"
       />
       <span className={checked ? 'font-bold text-ink' : 'text-muted'}>익명</span>
     </label>
@@ -1154,7 +1154,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
         {tags.map((t) => (
           <span
             key={t}
-            className="flex h-8 items-center gap-1 rounded-full bg-primary-soft pr-1 pl-3 text-[14px] font-semibold text-primary-deep"
+            className="flex h-8 items-center gap-1 rounded-full bg-highlight-soft pr-1 pl-3 text-[14px] font-semibold text-primary-deep"
           >
             #{t}
             <button

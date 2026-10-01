@@ -258,7 +258,7 @@ function MoodTile({ mood, active, onClick }: { mood: Mood; active: boolean; onCl
         'press flex cursor-pointer flex-col items-center rounded-2xl border-2 bg-surface px-1.5 pt-2.5 pb-2 text-center',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
         active
-          ? 'border-primary bg-primary-soft shadow-[0_3px_0_var(--color-primary)]'
+          ? 'border-highlight-deep bg-highlight-soft shadow-[0_3px_0_var(--color-highlight-deep)]'
           : 'border-line shadow-[0_3px_0_var(--color-line)]',
       )}
     >

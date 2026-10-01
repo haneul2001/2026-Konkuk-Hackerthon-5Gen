@@ -215,7 +215,7 @@ type ChoiceState = 'idle' | 'right' | 'wrong' | 'dim'
 
 const choiceStyles: Record<ChoiceState, { on: string; off: string }> = {
   idle: {
-    on: 'border-primary bg-primary-soft shadow-[0_3px_0_var(--color-primary)]',
+    on: 'border-highlight-deep bg-highlight-soft shadow-[0_3px_0_var(--color-highlight-deep)]',
     off: 'border-line bg-surface shadow-[0_3px_0_var(--color-line)]',
   },
   right: {
