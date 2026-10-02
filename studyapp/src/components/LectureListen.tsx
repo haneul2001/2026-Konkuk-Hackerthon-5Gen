@@ -3,6 +3,7 @@ import { Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import type { Concept, Lecture, TranscriptSegment } from '../../shared/types'
 import { api } from '../api/client'
 import { cn } from '../lib/cn'
+import { forSpeech, koreanVoice, sentences, speechSupported, summaryScript } from '../lib/speech'
 import { clock } from '../lib/time'
 import { Button, Card } from './ui'
 
@@ -10,40 +11,16 @@ import { Button, Card } from './ui'
 
 // ---------- 요약 듣기 (브라우저 내장 음성, Web Speech API) ----------
 
-type Section = { key: string; label: string; text: string }
-
-// 크롬은 긴 문장을 읽다 멈추는 일이 있어 문장 단위로 끊어 이어 읽는다
-function sentences(text: string): string[] {
-  return text
-    .split(/(?<=[.?!。])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-function koreanVoice(): SpeechSynthesisVoice | null {
-  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('ko'))
-  // 온라인 음성(구글)이 더 자연스러워서 먼저 고른다
-  return voices.find((v) => /google/i.test(v.name)) ?? voices[0] ?? null
-}
-
 const RATES = [0.8, 1, 1.25, 1.5] as const
 
 export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concepts: Concept[] }) {
-  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const supported = speechSupported
 
-  const sections = useMemo<Section[]>(() => {
-    const list: Section[] = [{ key: 'intro', label: '시작', text: `${lecture.title}. 요약을 들려드릴게요.` }]
-    if (lecture.overview) list.push({ key: 'overview', label: '강의 개요', text: lecture.overview })
-    concepts.forEach((c, i) => list.push({ key: c.id, label: c.term, text: `${i + 1}번째 개념, ${c.term}. ${c.summary}` }))
-    if (lecture.announcements?.length) {
-      list.push({ key: 'notice', label: '시험·과제 공지', text: `공지예요. ${lecture.announcements.join(' ')}` })
-    }
-    return list
-  }, [lecture, concepts])
+  const sections = useMemo(() => summaryScript(lecture, concepts), [lecture, concepts])
 
-  // 문장 줄: [섹션 번호, 문장]
+  // 문장 줄: [섹션 번호, 화면에 보일 문장, 읽을 문장]
   const lines = useMemo(
-    () => sections.flatMap((s, si) => sentences(s.text).map((t) => [si, t] as const)),
+    () => sections.flatMap((s, si) => sentences(s.text).map((t) => [si, t, forSpeech(t)] as const)),
     [sections],
   )
 
@@ -73,7 +50,7 @@ export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concept
       window.speechSynthesis.cancel()
       setLine(start)
       setPlaying(true)
-      const u = new SpeechSynthesisUtterance(lines[start][1])
+      const u = new SpeechSynthesisUtterance(lines[start][2])
       u.lang = 'ko-KR'
       u.rate = rate
       const voice = koreanVoice()
@@ -183,9 +160,16 @@ export function SummaryPlayer({ lecture, concepts }: { lecture: Lecture; concept
                 )}
               >
                 <p className="text-[15px] font-semibold">{s.label}</p>
-                {active && (
-                  <p className="mt-1 text-[14px] leading-relaxed text-pretty text-muted">{lines[line]?.[1]}</p>
-                )}
+                {/* 읽는 내용을 그대로 보여 주고, 지금 읽는 문장은 진하게 */}
+                <p className="mt-1 text-[14px] leading-relaxed text-pretty text-muted">
+                  {lines.map(([lsi, text], li) =>
+                    lsi === si ? (
+                      <span key={li} className={cn(active && li === line && 'font-semibold text-ink')}>
+                        {text}{' '}
+                      </span>
+                    ) : null,
+                  )}
+                </p>
               </button>
             </li>
           )

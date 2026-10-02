@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CalendarClock, CircleAlert, Layers, Loader, Megaphone, Play } from 'lucide-react'
+import { CalendarClock, CircleAlert, Layers, Loader, Megaphone, Play, Square, Volume2 } from 'lucide-react'
 import type { Concept, Lecture } from '../../shared/types'
 import { api } from '../api/client'
 import { RecordingPlayer, SummaryPlayer } from '../components/LectureListen'
 import { ButtonLink, Card, Segmented, Tag } from '../components/ui'
+import { cn } from '../lib/cn'
+import { speechSupported, stopSpeech, summaryScript, toggleSpeech, useSpeakingKey } from '../lib/speech'
 import { clock } from '../lib/time'
 
 // 강의 상세: 듣기(TTS) · 퀴즈(문제 풀기·플래시카드) · 전체 요약 탭. 기본은 듣기.
@@ -159,9 +161,15 @@ export function LecturePage() {
               )}
             </>
           )}
+          {tab === 'text' && (lecture.overview || concepts.length > 0) && (
+            <ReadAllBar lecture={lecture} concepts={concepts} />
+          )}
           {tab === 'text' && lecture.overview && (
             <Card className="p-4">
-              <p className="text-[13px] font-semibold text-muted">강의 개요</p>
+              <p className="flex items-center justify-between text-[13px] font-semibold text-muted">
+                강의 개요
+                <ReadButton id="text:overview" label="강의 개요" texts={[lecture.overview]} />
+              </p>
               <p className="mt-1.5 text-[15px] leading-relaxed text-pretty">{lecture.overview}</p>
             </Card>
           )}
@@ -170,6 +178,7 @@ export function LecturePage() {
               <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent-ink">
                 <Megaphone className="size-4" aria-hidden />
                 시험·과제 공지
+                <ReadButton id="text:notice" label="시험·과제 공지" texts={lecture.announcements!} className="ml-auto" />
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] leading-relaxed">
                 {lecture.announcements!.map((a) => (
@@ -183,6 +192,7 @@ export function LecturePage() {
               <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
                 <CalendarClock className="size-4" aria-hidden />
                 다음 시간 예고
+                <ReadButton id="text:preview" label="다음 시간 예고" texts={lecture.preview!} className="ml-auto" />
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-pretty">
                 {lecture.preview!.map((p) => (
@@ -199,7 +209,10 @@ export function LecturePage() {
               <ul className="divide-y-2 divide-line">
                 {concepts.map((c) => (
                   <li key={c.id} className="px-4 py-3.5">
-                    <p className="text-[15px] font-bold">{c.term}</p>
+                    <p className="flex items-center justify-between gap-2 text-[15px] font-bold">
+                      {c.term}
+                      <ReadButton id={`text:${c.id}`} label={c.term} texts={[`${c.term}. ${c.summary}`]} />
+                    </p>
                     <p className="mt-1 text-[14px] leading-relaxed text-pretty text-muted">
                       {c.summary}
                     </p>
@@ -271,5 +284,52 @@ function Processing({ lecture }: { lecture: Lecture }) {
         홈으로
       </ButtonLink>
     </Card>
+  )
+}
+
+// 전체 요약 듣기: 요약 듣기 탭과 같은 대본(인사 → 개요 → 개념 → 공지 → 예고 → 마무리)을 처음부터 읽는다
+function ReadAllBar({ lecture, concepts }: { lecture: Lecture; concepts: Concept[] }) {
+  const speaking = useSpeakingKey()
+  // 탭을 떠나거나 화면을 나가면 멈춘다
+  useEffect(() => stopSpeech, [])
+  if (!speechSupported) return null
+  const on = speaking === 'text:all'
+  return (
+    <Card className="flex items-center gap-3 p-3.5">
+      <Volume2 className="size-5 shrink-0 text-primary" aria-hidden />
+      <p className="min-w-0 flex-1 text-[14px] text-pretty text-muted">
+        {speaking && !on ? '선택한 부분을 읽는 중이에요.' : '요약 전체를 소리로 들을 수 있어요. 항목 옆 버튼은 그 부분만 읽어요.'}
+      </p>
+      <button
+        type="button"
+        onClick={() => toggleSpeech('text:all', summaryScript(lecture, concepts).map((s) => s.text))}
+        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 text-[14px] font-semibold text-white"
+      >
+        {on ? <Square className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+        {on ? '멈춤' : '전체 듣기'}
+      </button>
+    </Card>
+  )
+}
+
+// 카드 하나만 읽는 작은 버튼. 다시 누르면 멈춘다
+function ReadButton({ id, label, texts, className }: { id: string; label: string; texts: string[]; className?: string }) {
+  const speaking = useSpeakingKey()
+  if (!speechSupported) return null
+  const on = speaking === id
+  return (
+    <button
+      type="button"
+      aria-label={on ? `${label} 읽기 멈춤` : `${label} 듣기`}
+      aria-pressed={on}
+      onClick={() => toggleSpeech(id, texts)}
+      className={cn(
+        'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full',
+        on ? 'bg-primary text-white' : 'bg-bg text-muted',
+        className,
+      )}
+    >
+      {on ? <Square className="size-3.5" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
+    </button>
   )
 }

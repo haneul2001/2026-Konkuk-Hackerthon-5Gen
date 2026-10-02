@@ -36,6 +36,19 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", "", text).lower()
 
 
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[가-힣A-Za-z0-9]+", text.lower()) if len(w) >= 2}
+
+
+def plausible(old: str, new: str, summary: str) -> bool:
+    """LLM이 고른 용어집 이름이 말이 되는지 규칙으로 한 번 더 본다.
+    작은 모델이 엉뚱한 용어를 고른 적이 있다 ('나머지 계산' → '시간적 지역성', '캐시 효율성' → '캐시')."""
+    o, n = _norm(old), _norm(new)
+    if n in o and len(n) < len(o):
+        return False  # 더 넓은 말로 뭉개기 (캐시 효율성 → 캐시)
+    return n in _norm(summary) or bool(_words(old) & _words(new))
+
+
 def normalize_names(concepts: list[dict], vocabulary: list[str], provider: str) -> dict[str, str]:
     """concepts: [{id, term, summary}] → {conceptId: 용어집 이름} (바꿀 것만)"""
     if not concepts or not vocabulary:
@@ -45,13 +58,13 @@ def normalize_names(concepts: list[dict], vocabulary: list[str], provider: str) 
     message = f"## 용어집\n{numbered}\n\n## 개념\n{listing}\n\n개념마다 맞는 용어집 번호를 골라줘 (없으면 0)."
     picks = call(provider, SYSTEM, message, SCHEMA).data.get("items", [])
 
-    current = {c["id"]: c["term"] for c in concepts}
+    current = {c["id"]: c for c in concepts}
     renamed = {}
     for pick in picks:
         cid, n = pick.get("conceptId"), pick.get("pick")
         if cid not in current or not isinstance(n, int) or not 1 <= n <= len(vocabulary):
             continue  # 용어집 밖은 받지 않는다
-        new = vocabulary[n - 1]
-        if _norm(new) != _norm(current[cid]):
+        new, old = vocabulary[n - 1], current[cid]["term"]
+        if _norm(new) != _norm(old) and plausible(old, new, current[cid]["summary"]):
             renamed[cid] = new
     return renamed
